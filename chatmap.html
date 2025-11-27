@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Basic OpenStreetMap (Leaflet)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    #map {
+      height: 100%;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    const center = [50.9025, -3.4869];
+    const map = L.map('map').setView(center, 11);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Removed Tiverton centre marker
+
+    // Add legend
+    const legend = L.control({ position: 'bottomright' });
+    legend.onAdd = function () {
+      const div = L.DomUtil.create('div', 'info legend');
+      div.style.background = 'white';
+      div.style.padding = '8px 12px';
+      div.style.border = '1px solid #888';
+      div.style.borderRadius = '6px';
+      div.innerHTML = `
+        <strong>Legend</strong><br>
+        <img src="https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png" style="vertical-align:middle"> Food / Drink<br>
+        <img src="https://maps.gstatic.com/mapfiles/ms2/micons/orange-dot.png" style="vertical-align:middle"> Warm Space<br>
+        <img src="https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png" style="vertical-align:middle"> Other
+      `;
+      return div;
+    };
+    legend.addTo(map);
+
+    // Accurate Mid Devon district boundary via ONS Local Authority Districts (May 2023)
+    const midDevonGeoJsonUrl = 'https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Local_Authority_Districts_May_2023_UK_BFC_V2/FeatureServer/0/query?where=LAD23NM=%27Mid%20Devon%27&outFields=*&f=geojson';
+
+    fetch(midDevonGeoJsonUrl)
+      .then(response => response.json())
+      .then(data => {
+        L.geoJSON(data, {
+          style: {
+            color: 'black',
+            weight: 3,
+            fillOpacity: 0
+          }
+        }).addTo(map);
+      })
+      .catch(err => {
+        console.error('Failed to load Mid Devon boundary', err);
+      });
+
+    // Community POIs (approximate coordinates via postcode centroids)
+    const poiData = {
+      locations: [
+        {
+          name: "The Living Room (St George's Extension)",
+          venue: "St George’s Church Extension",
+          address_line1: "St George’s Church Extension",
+          address_line2: "Becks Square",
+          town: "Tiverton",
+          postcode: "EX16 6PJ",
+          country: "UK",
+          website: "https://www.tivertonchurch.org/community",
+          lat: 50.901285,
+          lng: -3.487417,
+          services: [
+            {
+              label: "The Living Room community cafe",
+              day: "Tuesday",
+              time: "10:00-12:00",
+              type: "social with refreshments"
+            }
+          ]
+        },
+        {
+          name: "St Paul's Church, Westexe",
+          venue: "St Paul's Church",
+          address_line1: "Church Street",
+          address_line2: "",
+          town: "Tiverton",
+          postcode: "EX16 5HU",
+          country: "UK",
+          website: "https://www.tivertonchurch.org/",
+          lat: 50.902523,
+          lng: -3.492419,
+          services: [
+            {
+              label: "Breakfast on the Go",
+              day: "Thursday",
+              time: "07:45-08:45",
+              notes: "term time only",
+              type: "breakfast"
+            },
+            {
+              label: "Lunch on the Go",
+              day: "Thursday",
+              time: "11:30-13:00",
+              type: "lunch"
+            }
+          ]
+        },
+        {
+          name: "ReRooted Surplus Food Cafe",
+          venue: "St George’s Church Rooms",
+          address_line1: "Fore Street",
+          address_line2: "",
+          town: "Tiverton",
+          postcode: "EX16 6PJ",
+          country: "UK",
+          website: "https://sustainabletiverton.org.uk/projects/food/",
+          lat: 50.901285,
+          lng: -3.487417,
+          services: [
+            {
+              label: "ReRooted Surplus Food Cafe",
+              day: "Saturday",
+              time: "last Saturday of every month",
+              type: "surplus food cafe"
+            }
+          ]
+        },
+        {
+          name: "Salvation Army Tiverton",
+          venue: "Salvation Army Hall",
+          address_line1: "Chapel Street",
+          address_line2: "",
+          town: "Tiverton",
+          postcode: "EX16 6DE",
+          country: "UK",
+          website: "https://www.salvationarmy.org.uk/tiverton",
+          lat: 50.907008,
+          lng: -3.479336,
+          services: [
+            {
+              label: "Tuesday Coffee Morning and Brunch",
+              day: "Tuesday",
+              time: "10:30-12:30",
+              type: "coffee morning and brunch"
+            }
+          ]
+        },
+        {
+          name: "Cullompton Community Centre",
+          venue: "Cullompton Community Centre",
+          address_line1: "Pye Corner",
+          address_line2: "",
+          town: "Cullompton",
+          postcode: "EX15 1JX",
+          country: "UK",
+          website: "https://cullomptoncommunitycentre.org.uk/",
+          lat: 50.855971,
+          lng: -3.391676,
+          services: [
+            {
+              label: "Coffee Morning",
+              day: "Friday",
+              time: "10:00-11:30",
+              type: "coffee morning"
+            }
+          ]
+        },
+        {
+          name: "King Street Chapel Tiverton",
+          venue: "King Street Chapel",
+          address_line1: "King Street",
+          address_line2: "",
+          town: "Tiverton",
+          postcode: "EX16 5JE",
+          country: "UK",
+          website: "https://kingstchapel.org.uk/",
+          lat: 50.901986,
+          lng: -3.49374,
+          services: [
+            {
+              label: "Big Breakfast Sunday",
+              day: "Sunday",
+              time: "10:30-11:30",
+              notes: "every fourth Sunday",
+              type: "breakfast"
+            }
+          ]
+        },
+        {
+          name: "Witheridge Methodist Church",
+          venue: "Witheridge Methodist Church",
+          address_line1: "West Street",
+          address_line2: "",
+          town: "Witheridge",
+          postcode: "EX16 8AA",
+          country: "UK",
+          website: "https://www.ringsashcircuit.org.uk/",
+          lat: 50.917153,
+          lng: -3.703587,
+          services: [
+            {
+              label: "Bacon Bap Coffee Morning",
+              day: "Saturday",
+              time: "10:00-13:00",
+              notes: "1st Saturday of every month",
+              type: "coffee morning"
+            }
+          ]
+        },
+        {
+          name: "Hele Lane Methodist Church",
+          venue: "Hele Lane Methodist Church",
+          address_line1: "Hele Lane",
+          address_line2: "Black Dog",
+          town: "Black Dog",
+          postcode: "EX17 4QS",
+          country: "UK",
+          website: "https://www.helelane.org.uk/",
+          lat: 50.875292,
+          lng: -3.698421,
+          services: [
+            {
+              label: "Fourth Sunday Feast",
+              day: "Sunday",
+              time: "12:00-13:00",
+              notes: "fourth Sunday of every month",
+              type: "meal"
+            }
+          ]
+        },
+        {
+          name: "Crediton Congregational Church",
+          venue: "Crediton Congregational Church",
+          address_line1: "98 High Street",
+          address_line2: "",
+          town: "Crediton",
+          postcode: "EX17 3LF",
+          country: "UK",
+          website: "https://www.creditoncongregational.org/",
+          lat: 50.791326,
+          lng: -3.661801,
+          services: [
+            {
+              label: "Causeway Coffee Drop-In",
+              day: "Wednesday",
+              time: "10:00-12:00",
+              notes: "for people with learning disabilities, carers and friends",
+              type: "coffee drop-in"
+            },
+            {
+              label: "Coffee and Company",
+              day: "Thursday",
+              time: "10:00-11:30",
+              type: "coffee morning"
+            }
+          ]
+        },
+        {
+          name: "The Bookery Crediton",
+          venue: "The Bookery",
+          address_line1: "21 High Street",
+          address_line2: "",
+          town: "Crediton",
+          postcode: "EX17 3AH",
+          country: "UK",
+          website: "https://thebookery.org.uk/",
+          lat: 50.790443,
+          lng: -3.658779,
+          services: [
+            {
+              label: "Soup and Stories",
+              day: "varies",
+              time: "12:30-14:00",
+              notes: "until 12th Dec",
+              type: "meal and social"
+            },
+            {
+              label: "Community Lunch",
+              day: "Friday",
+              time: "varies",
+              notes: "third Friday of every month",
+              type: "meal"
+            }
+          ]
+        },
+        {
+          name: "The Square Corner Uffculme",
+          venue: "The Square Corner",
+          address_line1: "The Square",
+          address_line2: "",
+          town: "Uffculme",
+          postcode: "EX15 3AA",
+          country: "UK",
+          website: "https://www.squarecorner.org.uk/",
+          lat: 50.906933,
+          lng: -3.328376,
+          services: [
+            {
+              label: "Warm Space",
+              day: "Friday",
+              time: "10:30-15:00",
+              notes: "fortnightly",
+              type: "warm space"
+            }
+          ]
+        },
+        {
+          name: "Culm Valley Methodist Church Willand",
+          venue: "Culm Valley Methodist Church",
+          address_line1: "Gables Road",
+          address_line2: "",
+          town: "Willand",
+          postcode: "EX15 2PL",
+          country: "UK",
+          website: "https://www.tivwell-methodists.org.uk/culm-valley",
+          lat: 50.888978,
+          lng: -3.374049,
+          services: [
+            {
+              label: "Warm Space",
+              day: "Thursday",
+              time: "15:00-17:00",
+              type: "warm space"
+            }
+          ]
+        },
+        {
+          name: "Sunningmead Community Centre",
+          venue: "Sunningmead Community Centre",
+          address_line1: "Lazenby Road",
+          address_line2: "",
+          town: "Tiverton",
+          postcode: "EX16 4AL",
+          country: "UK",
+          website: "https://sunningmead.org.uk/",
+          lat: 50.902531,
+          lng: -3.469721,
+          services: [
+            {
+              label: "Warm Hub",
+              day: "Weekdays",
+              time: "09:00-17:00",
+              type: "warm space"
+            }
+          ]
+        },
+        {
+          name: "Tiverton Library",
+          venue: "Tiverton Library",
+          address_line1: "Phoenix House, Phoenix Lane",
+          address_line2: "",
+          town: "Tiverton",
+          postcode: "EX16 6SA",
+          country: "UK",
+          website: "https://www.devonlibraries.org.uk/web/arena/tivertonlibrary",
+          lat: 50.90142,
+          lng: -3.485089,
+          services: [
+            {
+              label: "Warm Space",
+              day: "varies",
+              time: "library opening hours",
+              type: "warm space"
+            }
+          ]
+        },
+        {
+          name: "Bampton LARC",
+          venue: "Bampton Library and Resource Centre (LARC)",
+          address_line1: "Old School, Station Road",
+          address_line2: "",
+          town: "Bampton",
+          postcode: "EX16 9NG",
+          country: "UK",
+          website: "https://bamptonlarc.org.uk/",
+          lat: 50.988938,
+          lng: -3.489007,
+          services: [
+            {
+              label: "Warm Space",
+              day: "varies",
+              time: "centre opening hours",
+              type: "warm space"
+            }
+          ]
+        },
+        {
+          name: "The Rest A While Day Centre",
+          venue: "Rest A While Day Centre",
+          address_line1: "Village centre",
+          address_line2: "",
+          town: "Witheridge",
+          postcode: "EX16 8AH",
+          country: "UK",
+          website: "https://witheridge.online/directory/the-rest-a-while/",
+          lat: 50.91633,
+          lng: -3.700214,
+          services: [
+            {
+              label: "Rest A While",
+              day: "Monday-Saturday",
+              time: "10:00-12:00",
+              type: "warm space"
+            }
+          ]
+        },
+        {
+          name: "Crediton Methodist Church",
+          venue: "Crediton Methodist Church",
+          address_line1: "Union Road",
+          address_line2: "",
+          town: "Crediton",
+          postcode: "EX17 3AW",
+          country: "UK",
+          website: "https://www.creditonmethodist.org.uk/",
+          lat: 50.790247,
+          lng: -3.656161,
+          services: [
+            {
+              label: "Coffee Morning / Warm Space",
+              day: "Friday",
+              time: "10:00-12:00",
+              type: "coffee morning"
+            },
+            {
+              label: "Coffee Morning / Warm Space",
+              day: "Saturday",
+              time: "10:00-11:30",
+              type: "coffee morning"
+            }
+          ]
+        },
+        {
+          name: "Folklore Library and Archive",
+          venue: "Folklore Library and Archive",
+          address_line1: "Belle Parade",
+          address_line2: "c/o Crediton Library",
+          town: "Crediton",
+          postcode: "EX17 2AA",
+          country: "UK",
+          website: "https://www.folklorelibrary.com/",
+          lat: 50.791254,
+          lng: -3.656016,
+          services: [
+            {
+              label: "Open Archive / Warm Space",
+              day: "varies",
+              time: "library opening hours",
+              type: "warm space"
+            }
+          ]
+        },
+        {
+          name: "Crediton Library",
+          venue: "Crediton Library",
+          address_line1: "Belle Parade",
+          address_line2: "",
+          town: "Crediton",
+          postcode: "EX17 2AA",
+          country: "UK",
+          website: "https://www.devonlibraries.org.uk/web/arena/creditonlibrary",
+          lat: 50.791254,
+          lng: -3.656016,
+          services: [
+            {
+              label: "Warm Space",
+              day: "varies",
+              time: "library opening hours",
+              type: "warm space"
+            }
+          ]
+        }
+      ]
+    };
+
+    function buildPopup(loc) {
+      let html = `<strong>${loc.name}</strong>`;
+      if (loc.venue && loc.venue !== loc.name) {
+        html += `<br>${loc.venue}`;
+      }
+      html += `<br>${loc.address_line1}`;
+      if (loc.address_line2) {
+        html += `<br>${loc.address_line2}`;
+      }
+      html += `<br>${loc.town} ${loc.postcode}`;
+
+      if (loc.website) {
+        html += `<br><a href="${loc.website}" target="_blank">Website</a>`;
+      }
+
+      if (loc.services && loc.services.length) {
+        html += '<hr><ul style="padding-left: 1.2em; margin: 0.5em 0 0">';
+        loc.services.forEach(service => {
+          html += '<li>';
+          html += `<strong>${service.label}</strong>`;
+
+          const bits = [];
+          if (service.day) bits.push(service.day);
+          if (service.time) bits.push(service.time);
+          if (service.notes) bits.push(service.notes);
+
+          if (bits.length) {
+            html += ` – ${bits.join(', ')}`;
+          }
+
+          if (service.type) {
+            html += ` (${service.type})`;
+          }
+
+          html += '</li>';
+        });
+        html += '</ul>';
+      }
+
+      return html;
+    }
+
+    // Predefined icons: orange for warm spaces, blue for food
+    const warmIcon = L.icon({
+      iconUrl: 'https://maps.gstatic.com/mapfiles/ms2/micons/orange-dot.png',
+      iconSize: [32, 32],
+      iconAnchor: [16, 32],
+      popupAnchor: [0, -28]
+    });
+
+    const foodIcon = L.icon({
+      iconUrl: 'https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png',
+      iconSize: [32, 32],
+      iconAnchor: [16, 32],
+      popupAnchor: [0, -28]
+    });
+
+    const defaultIcon = L.icon({
+      iconUrl: 'https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png',
+      iconSize: [32, 32],
+      iconAnchor: [16, 32],
+      popupAnchor: [0, -28]
+    });
+
+    // Colored markers
+    poiData.locations.forEach(loc => {
+      if (typeof loc.lat === 'number' && typeof loc.lng === 'number') {
+        const hasWarm = loc.services.some(s => s.type && s.type.toLowerCase().includes('warm'));
+        const hasFood = loc.services.some(s => {
+          const t = s.type ? s.type.toLowerCase() : '';
+          return (
+            t.includes('breakfast') ||
+            t.includes('lunch') ||
+            t.includes('meal') ||
+            t.includes('cafe') ||
+            t.includes('food') ||
+            t.includes('coffee') ||
+            t.includes('refresh') ||
+            t.includes('drink')
+          );
+        });
+
+        // Priority: blue if any food; otherwise orange if warm; otherwise default red
+        let icon = defaultIcon;
+        if (hasWarm) icon = warmIcon;
+        if (hasFood) icon = foodIcon;
+
+        L.marker([loc.lat, loc.lng], { icon })
+          .addTo(map)
+          .bindPopup(buildPopup(loc));
+      }
+    });
+  </script>
+</body>
+</html>
