@@ -2,28 +2,195 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Basic OpenStreetMap (Leaflet)</title>
+  <title>Mid Devon Community Map</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <style>
     html, body {
       height: 100%;
       margin: 0;
       padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
+
+    body {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .view-toggle {
+      display: flex;
+      border-bottom: 1px solid #ccc;
+      background: #f8f8f8;
+    }
+
+    .view-toggle button {
+      flex: 1;
+      padding: 0.6rem 0.8rem;
+      border: none;
+      background: transparent;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+
+    .view-toggle button.active {
+      background: #ffffff;
+      border-bottom: 3px solid #0077cc;
+      font-weight: 600;
+    }
+
+    .view-toggle button:not(.active) {
+      opacity: 0.7;
+    }
+
+    #map,
+    #directory {
+      width: 100%;
+      flex: 1 1 auto;
+    }
+
     #map {
       height: 100%;
-      width: 100%;
+    }
+
+    #directory {
+      overflow-y: auto;
+      padding: 0.75rem 1rem 1rem;
+      box-sizing: border-box;
+      background: #fafafa;
+    }
+
+    .filter-toggle {
+      display: none;
+      border-bottom: 1px solid #ddd;
+      background: #ffffff;
+      padding: 0.3rem 0.5rem;
+      gap: 0.35rem;
+    }
+
+    .filter-toggle button {
+      flex: 1;
+      padding: 0.35rem 0.5rem;
+      border-radius: 999px;
+      border: 1px solid #ccc;
+      font-size: 0.8rem;
+      background: #f5f5f5;
+      cursor: pointer;
+    }
+
+    .filter-toggle button.active {
+      border-width: 2px;
+      font-weight: 600;
+    }
+
+    .filter-toggle button[data-filter="all"].active {
+      background: #ffffff;
+      border-color: #777;
+    }
+
+    .filter-toggle button[data-filter="food"].active {
+      background: #e8f1ff;
+      border-color: #2b7bff;
+    }
+
+    .filter-toggle button[data-filter="warm"].active {
+      background: #fff1df;
+      border-color: #ff8a1f;
+    }
+
+    .filter-toggle button[data-filter="other"].active {
+      background: #f0f0f0;
+      border-color: #999;
+    }
+
+    /* Venue cards */
+    .venue-card {
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      padding: 0.75rem 0.9rem;
+      margin-bottom: 0.75rem;
+      background: #ffffff;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .venue-card.venue-food {
+      border-color: #2b7bff;
+      background: #e8f1ff;
+    }
+
+    .venue-card.venue-warm {
+      border-color: #ff8a1f;
+      background: #fff1df;
+    }
+
+    .venue-card.venue-other {
+      border-color: #999;
+      background: #f5f5f5;
+    }
+
+    .venue-card h3 {
+      margin: 0 0 0.25rem;
+      font-size: 1rem;
+    }
+
+    .venue-card .venue-meta {
+      font-size: 0.85rem;
+      color: #555;
+      margin-bottom: 0.25rem;
+    }
+
+    .venue-card ul {
+      margin: 0.4rem 0 0;
+      padding-left: 1.1rem;
+      font-size: 0.85rem;
+    }
+
+    .venue-card a {
+      font-size: 0.85rem;
+    }
+
+    .venue-card-image {
+      width: min(250px, 45vw);
+      height: min(150px, 27vw);
+      object-fit: cover;
+      border-radius: 6px;
+      flex: 0 0 auto;
+      border: 1px solid rgba(0,0,0,0.12);
+      background: rgba(255,255,255,0.7);
+    }
+
+    .venue-card-content {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    @media (max-width: 700px) {
+      .venue-card-image {
+        width: min(160px, 45vw);
+        height: min(96px, 27vw);
+      }
     }
   </style>
 </head>
 <body>
-  <div id="map"></div>
+  <div class="view-toggle">
+    <button type="button" data-view="map" class="active">Map</button>
+    <button type="button" data-view="list">List</button>
+  </div>
+
+  <div class="filter-toggle" id="list-filters" style="display: none;">
+    <button type="button" data-filter="all" class="active">All</button>
+    <button type="button" data-filter="food">Food / Drink</button>
+    <button type="button" data-filter="warm">Warm Spaces</button>
+    <button type="button" data-filter="other">Other</button>
+  </div>
+
+  <div id="map" class="view view-map"></div>
+  <div id="directory" class="view view-list" style="display: none;"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -36,9 +203,7 @@
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    // Removed Tiverton centre marker
-
-    // Add legend
+    // Legend
     const legend = L.control({ position: 'bottomright' });
     legend.onAdd = function () {
       const div = L.DomUtil.create('div', 'info legend');
@@ -56,7 +221,7 @@
     };
     legend.addTo(map);
 
-    // Accurate Mid Devon district boundary via ONS Local Authority Districts (May 2023)
+    // Mid Devon boundary
     const midDevonGeoJsonUrl = 'https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Local_Authority_Districts_May_2023_UK_BFC_V2/FeatureServer/0/query?where=LAD23NM=%27Mid%20Devon%27&outFields=*&f=geojson';
 
     fetch(midDevonGeoJsonUrl)
@@ -86,6 +251,7 @@
           postcode: "EX16 6PJ",
           country: "UK",
           website: "https://www.tivertonchurch.org/community",
+          list_image_url: "https://static.wixstatic.com/media/b252be_7c034a1ee2dc421c93a508022e2562f8~mv2.png/v1/crop/x_0,y_55,w_1080,h_961/fill/w_490,h_436,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/Copy%20of%20Living%20Room%20Church%20Suite.png",
           lat: 50.901285,
           lng: -3.487417,
           services: [
@@ -106,6 +272,7 @@
           postcode: "EX16 5HU",
           country: "UK",
           website: "https://www.tivertonchurch.org/",
+          list_image_url: "https://scontent-lhr8-2.xx.fbcdn.net/v/t39.30808-6/541042829_1133963345506311_2177666363584014936_n.jpg?_nc_cat=101&_nc_cb=99be929b-f3b7c874&ccb=1-7&_nc_sid=127cfc&_nc_ohc=LnyRxJ_u-CUQ7kNvwG0-kO9&_nc_oc=AdkhIRwHkMBG9V-n4Q-6g2nIwa7zJb_v5uG6Sn7C0gqH_JBAx1Kw9xaKB_sO1J4V9dQ&_nc_zt=23&_nc_ht=scontent-lhr8-2.xx&_nc_gid=IOjtqU-fWBw07lQ4RL56vQ&oh=00_AfmBrdCWYJ0uRprUzv8oDBv29nQDg_I96vspj17V73uSNg&oe=695837F9",
           lat: 50.902523,
           lng: -3.492419,
           services: [
@@ -133,6 +300,7 @@
           postcode: "EX16 6PJ",
           country: "UK",
           website: "https://sustainabletiverton.org.uk/projects/food/",
+            list_image_url: "https://sustainabletiverton.org.uk/wp-content/uploads/elementor/thumbs/Final-rerooted-large-scaled-qk551l2k07vtugkr24d4e13529anw1hju29axg8bgg.webp",
           lat: 50.901285,
           lng: -3.487417,
           services: [
@@ -153,6 +321,7 @@
           postcode: "EX16 6DE",
           country: "UK",
           website: "https://www.salvationarmy.org.uk/tiverton",
+          list_image_url: "https://www.salvationarmy.org.uk/themes/custom/salvation_army/logo.svg",
           lat: 50.907008,
           lng: -3.479336,
           services: [
@@ -173,6 +342,7 @@
           postcode: "EX15 1JX",
           country: "UK",
           website: "https://cullomptoncommunitycentre.org.uk/",
+          list_image_url: "https://wallpapers.com/images/hd/morning-coffee-pictures-btfkp0zb7m6tgbos.jpg",
           lat: 50.855971,
           lng: -3.391676,
           services: [
@@ -192,7 +362,8 @@
           town: "Tiverton",
           postcode: "EX16 5JE",
           country: "UK",
-          website: "https://kingstchapel.org.uk/",
+          website: "http://www.kingstchapel.org.uk/",
+          list_image_url: "https://scontent-lhr8-1.xx.fbcdn.net/v/t39.30808-6/586806160_1290443013118988_3233051487970248829_n.jpg?_nc_cat=111&_nc_cb=99be929b-f3b7c874&ccb=1-7&_nc_sid=127cfc&_nc_ohc=maeKG_oW2c8Q7kNvwGId58U&_nc_oc=AdmmmJF25jcPaiuorRg7-nklgzMMzY0KsO8RGFtktonOCbCPA5UjtJLAfmaknnzXWJ8&_nc_zt=23&_nc_ht=scontent-lhr8-1.xx&_nc_gid=u5o15PIlLFrE1bTMZ2iDOg&oh=00_AfmQZ-BBDfpVIEt4MsBo115nPBXjt9l5GUl3Coivvofcgg&oe=695844C3",
           lat: 50.901986,
           lng: -3.49374,
           services: [
@@ -213,7 +384,8 @@
           town: "Witheridge",
           postcode: "EX16 8AA",
           country: "UK",
-          website: "https://www.ringsashcircuit.org.uk/",
+          website: "https://www.witheridgevoice.org/event-details/witheridge-methodist-church-bacon-bap-coffee-morning-2025-08-02-10-00/",
+          list_image_url: "https://static.wixstatic.com/media/245f73_5bffbe9d9e79481dab1c2dd03d25f78f~mv2.jpg/v1/fill/w_844,h_844,fp_0.50_0.50,q_85,usm_0.66_1.00_0.01,enc_auto/245f73_5bffbe9d9e79481dab1c2dd03d25f78f~mv2.jpg",
           lat: 50.917153,
           lng: -3.703587,
           services: [
@@ -234,7 +406,8 @@
           town: "Black Dog",
           postcode: "EX17 4QS",
           country: "UK",
-          website: "https://www.helelane.org.uk/",
+          website: "https://www.helelane.org.uk/calendar/fourth-friday-feast/",
+          list_image_url: "https://www.helelane.org.uk/wp-content/uploads/2024/10/vegetables-1006694_640.jpg",
           lat: 50.875292,
           lng: -3.698421,
           services: [
@@ -494,18 +667,12 @@
 
     function buildPopup(loc) {
       let html = `<strong>${loc.name}</strong>`;
-      if (loc.venue && loc.venue !== loc.name) {
-        html += `<br>${loc.venue}`;
-      }
+      if (loc.venue && loc.venue !== loc.name) html += `<br>${loc.venue}`;
       html += `<br>${loc.address_line1}`;
-      if (loc.address_line2) {
-        html += `<br>${loc.address_line2}`;
-      }
+      if (loc.address_line2) html += `<br>${loc.address_line2}`;
       html += `<br>${loc.town} ${loc.postcode}`;
 
-      if (loc.website) {
-        html += `<br><a href="${loc.website}" target="_blank">Website</a>`;
-      }
+      if (loc.website) html += `<br><a href="${loc.website}" target="_blank">Website</a>`;
 
       if (loc.services && loc.services.length) {
         html += '<hr><ul style="padding-left: 1.2em; margin: 0.5em 0 0">';
@@ -518,13 +685,8 @@
           if (service.time) bits.push(service.time);
           if (service.notes) bits.push(service.notes);
 
-          if (bits.length) {
-            html += ` – ${bits.join(', ')}`;
-          }
-
-          if (service.type) {
-            html += ` (${service.type})`;
-          }
+          if (bits.length) html += ` – ${bits.join(', ')}`;
+          if (service.type) html += ` (${service.type})`;
 
           html += '</li>';
         });
@@ -534,7 +696,7 @@
       return html;
     }
 
-    // Predefined icons: orange for warm spaces, blue for food
+    // Icons
     const warmIcon = L.icon({
       iconUrl: 'https://maps.gstatic.com/mapfiles/ms2/micons/orange-dot.png',
       iconSize: [32, 32],
@@ -556,34 +718,249 @@
       popupAnchor: [0, -28]
     });
 
-    // Colored markers
-    poiData.locations.forEach(loc => {
+    function classifyLocation(loc) {
+      const hasWarm = (loc.services || []).some(s => s.type && s.type.toLowerCase().includes('warm'));
+      const hasFood = (loc.services || []).some(s => {
+        const t = s.type ? s.type.toLowerCase() : '';
+        return (
+          t.includes('breakfast') ||
+          t.includes('lunch') ||
+          t.includes('meal') ||
+          t.includes('cafe') ||
+          t.includes('food') ||
+          t.includes('coffee') ||
+          t.includes('refresh') ||
+          t.includes('drink')
+        );
+      });
+
+      let category = 'other';
+      if (hasWarm) category = 'warm';
+      if (hasFood) category = 'food';
+
+      return { hasWarm, hasFood, category };
+    }
+
+    const markerById = {};
+
+    // Map markers
+    poiData.locations.forEach((loc, index) => {
       if (typeof loc.lat === 'number' && typeof loc.lng === 'number') {
-        const hasWarm = loc.services.some(s => s.type && s.type.toLowerCase().includes('warm'));
-        const hasFood = loc.services.some(s => {
-          const t = s.type ? s.type.toLowerCase() : '';
-          return (
-            t.includes('breakfast') ||
-            t.includes('lunch') ||
-            t.includes('meal') ||
-            t.includes('cafe') ||
-            t.includes('food') ||
-            t.includes('coffee') ||
-            t.includes('refresh') ||
-            t.includes('drink')
-          );
-        });
+        const { category } = classifyLocation(loc);
 
-        // Priority: blue if any food; otherwise orange if warm; otherwise default red
         let icon = defaultIcon;
-        if (hasWarm) icon = warmIcon;
-        if (hasFood) icon = foodIcon;
+        if (category === 'warm') icon = warmIcon;
+        if (category === 'food') icon = foodIcon;
 
-        L.marker([loc.lat, loc.lng], { icon })
+        const marker = L.marker([loc.lat, loc.lng], { icon })
           .addTo(map)
           .bindPopup(buildPopup(loc));
+
+        markerById[index] = marker;
       }
     });
+
+    // Directory / list view
+    const FALLBACK_IMAGES = {
+      drink: "https://wallpapers.com/images/hd/morning-coffee-pictures-btfkp0zb7m6tgbos.jpg",
+      food: "https://media.istockphoto.com/photos/cooking-picture-id477128601?k=6&m=477128601&s=170667a&w=0&h=qbbeKlcd1tkv6z8YlsPYWh7H_IwlHCjtDjlKW74s1MY=",
+      warm: "https://cdn3.vectorstock.com/i/1000x1000/59/37/stay-warm-quote-vector-34585937.jpg"
+    };
+
+    function normaliseText(s) {
+      return (s || '').toString().toLowerCase();
+    }
+
+    function hasAnyKeyword(text, keywords) {
+      return keywords.some(k => text.includes(k));
+    }
+
+    // Decide fallback image based on the *events/services* at a venue.
+    // Rules:
+    // - If it's a warm-space venue (category === 'warm'), always use the warm image.
+    // - Otherwise, if any service indicates FOOD, use food image.
+    // - Otherwise, if services indicate DRINK (e.g. coffee morning), use drink image.
+    // - Otherwise, default to drink (looks nicer than a blank card).
+    function getFallbackImageForLocation(loc, category) {
+      if (category === 'warm') return FALLBACK_IMAGES.warm;
+
+      const services = Array.isArray(loc.services) ? loc.services : [];
+      const combined = services.map(s => `${s.label || ''} ${s.type || ''}`.trim()).join(' | ');
+      const t = normaliseText(combined);
+
+      const foodKeywords = [
+        'breakfast', 'lunch', 'meal', 'soup', 'brunch', 'food', 'cafe', 'café', 'feast', 'dinner'
+      ];
+      const drinkKeywords = [
+        'coffee', 'tea', 'drink', 'refreshment', 'refreshments'
+      ];
+
+      if (hasAnyKeyword(t, foodKeywords)) return FALLBACK_IMAGES.food;
+      if (hasAnyKeyword(t, drinkKeywords)) return FALLBACK_IMAGES.drink;
+
+      return FALLBACK_IMAGES.drink;
+    }
+
+    function buildDirectoryItem(loc, category, id) {
+      let html = '<div class="venue-card venue-' + category + '" data-loc-id="' + id + '">';
+
+      const imgUrl = loc.list_image_url || getFallbackImageForLocation(loc, category);
+      if (imgUrl) {
+        html += '<img class="venue-card-image" src="' + imgUrl + '" alt="' + loc.name.replace(/"/g, '') + ' image" loading="lazy">';
+      }
+
+      html += '<div class="venue-card-content">';
+
+      html += '<h3>' + loc.name + '</h3>';
+
+      if (loc.venue && loc.venue !== loc.name) {
+        html += '<div class="venue-meta">' + loc.venue + '</div>';
+      }
+
+      let address = loc.address_line1;
+      if (loc.address_line2) address += ', ' + loc.address_line2;
+      address += ', ' + loc.town + ' ' + loc.postcode;
+      html += '<div class="venue-meta">' + address + '</div>';
+
+      // Website + View on map
+      html += '<div class="venue-meta">';
+      if (loc.website) html += '<a href="' + loc.website + '" target="_blank">Website</a> · ';
+      html += '<a href="#" class="view-on-map" data-loc-id="' + id + '">View on map</a>';
+      html += '</div>';
+
+      if (loc.services && loc.services.length) {
+        html += '<ul>';
+        loc.services.forEach(service => {
+          html += '<li>';
+          html += '<strong>' + service.label + '</strong>';
+
+          const bits = [];
+          if (service.day) bits.push(service.day);
+          if (service.time) bits.push(service.time);
+          if (service.notes) bits.push(service.notes);
+
+          if (bits.length) html += ' – ' + bits.join(', ');
+          if (service.type) html += ' (' + service.type + ')';
+
+          html += '</li>';
+        });
+        html += '</ul>';
+      }
+
+      html += '</div>'; // venue-card-content
+      html += '</div>'; // venue-card
+      return html;
+    }
+
+    let currentFilter = 'all';
+
+    function renderDirectory() {
+      const container = document.getElementById('directory');
+      let html = '';
+
+      poiData.locations.forEach((loc, index) => {
+        const { category } = classifyLocation(loc);
+
+        if (currentFilter === 'food' && category !== 'food') return;
+        if (currentFilter === 'warm' && category !== 'warm') return;
+        if (currentFilter === 'other' && category !== 'other') return;
+
+        html += buildDirectoryItem(loc, category, index);
+      });
+
+      container.innerHTML = html;
+    }
+
+    renderDirectory();
+
+    // View + filter controls
+    const mapView = document.getElementById('map');
+    const listView = document.getElementById('directory');
+    const toggleButtons = document.querySelectorAll('.view-toggle button');
+    const filterBar = document.getElementById('list-filters');
+    const filterButtons = document.querySelectorAll('#list-filters button');
+
+    // Click on "View on map" link -> jump to that venue on the map
+    listView.addEventListener('click', (event) => {
+      const link = event.target.closest('.view-on-map');
+      if (!link) return;
+      event.preventDefault();
+
+      const id = link.getAttribute('data-loc-id');
+      const marker = markerById[id];
+      const loc = poiData.locations[id];
+      if (!marker || !loc) return;
+
+      // Switch to map view
+      toggleButtons.forEach(b => b.classList.remove('active'));
+      const mapButton = document.querySelector('.view-toggle button[data-view="map"]');
+      if (mapButton) mapButton.classList.add('active');
+
+      mapView.style.display = 'block';
+      listView.style.display = 'none';
+      filterBar.style.display = 'none';
+
+      setTimeout(() => {
+        map.invalidateSize();
+        map.setView([loc.lat, loc.lng], 13);
+        marker.openPopup();
+      }, 0);
+    });
+
+    filterButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentFilter = btn.dataset.filter || 'all';
+
+        filterButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        renderDirectory();
+      });
+    });
+
+    toggleButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const view = btn.dataset.view;
+
+        toggleButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        if (view === 'map') {
+          mapView.style.display = 'block';
+          listView.style.display = 'none';
+          filterBar.style.display = 'none';
+          setTimeout(() => map.invalidateSize(), 0);
+        } else {
+          mapView.style.display = 'none';
+          listView.style.display = 'block';
+          filterBar.style.display = 'flex';
+        }
+      });
+    });
+
+    // --- sanity checks (lightweight tests) ---
+    (function runSanityChecks() {
+      console.assert(Array.isArray(poiData.locations) && poiData.locations.length > 0, 'Expected at least one location');
+
+      const bad = poiData.locations.filter(l => typeof l.lat !== 'number' || typeof l.lng !== 'number');
+      console.assert(bad.length === 0, 'Every location should have numeric lat/lng');
+
+      const badImages = poiData.locations.filter(l => l.list_image_url && typeof l.list_image_url !== 'string');
+      console.assert(badImages.length === 0, 'list_image_url must be a string when present');
+
+      // Fallback image tests
+      const t1 = getFallbackImageForLocation({ services: [{ type: 'coffee morning', label: 'Coffee Morning' }] }, 'other');
+      console.assert(t1 === FALLBACK_IMAGES.drink, 'Expected drink fallback for coffee-only');
+
+      const t2 = getFallbackImageForLocation({ services: [{ type: 'lunch', label: 'Lunch on the Go' }] }, 'other');
+      console.assert(t2 === FALLBACK_IMAGES.food, 'Expected food fallback for lunch');
+
+      const t3 = getFallbackImageForLocation({ services: [{ type: 'warm space', label: 'Warm Space' }] }, 'warm');
+      console.assert(t3 === FALLBACK_IMAGES.warm, 'Expected warm fallback for warm space');
+
+      const t4 = getFallbackImageForLocation({ services: [{ type: 'coffee morning and brunch', label: 'Coffee Morning and Brunch' }] }, 'food');
+      console.assert(t4 === FALLBACK_IMAGES.food, 'Expected food fallback when brunch/food present');
+    })();
   </script>
 </body>
 </html>
