@@ -3,13 +3,19 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
 html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif}body{display:flex;flex-direction:column}
+.hero{padding:1rem 1.1rem;background:#102a43;color:#f5f7fb}
+.hero h1{margin:0 0 .25rem;font-size:1.35rem}
+.hero p{margin:0;font-size:.95rem;max-width:60ch;color:#d9e2ef}
 .bar{display:flex;border-bottom:1px solid #ccc;background:#f8f8f8}
 .bar button{flex:1;padding:.6rem .8rem;border:0;background:0;font-size:.95rem;cursor:pointer;opacity:.75}
 .bar button.on{background:#fff;border-bottom:3px solid #07c;font-weight:600;opacity:1}
-#map,#list{flex:1}#list{display:none;overflow:auto;padding:.75rem 1rem;background:#fafafa;box-sizing:border-box}
-.filters{display:none;gap:.35rem;padding:.35rem .5rem;border-bottom:1px solid #ddd;background:#fff}
+#map,#list{flex:1;min-height:0}#map{min-height:320px}#list{display:none;overflow:auto;padding:.75rem 1rem;background:#fafafa;box-sizing:border-box}
+.filters{display:none;gap:.5rem;padding:.5rem .75rem;border-bottom:1px solid #ddd;background:#fff;flex-wrap:wrap;align-items:center}
+.filters label{font-size:.8rem;color:#333}
+.filters input{flex:1 1 220px;min-width:180px;padding:.4rem .6rem;border:1px solid #ccc;border-radius:6px;font-size:.85rem}
 .filters button{flex:1;padding:.35rem .5rem;border-radius:999px;border:1px solid #ccc;font-size:.8rem;background:#f5f5f5;cursor:pointer}
 .filters button.on{border-width:2px;font-weight:600}
+.filters .count{font-size:.8rem;color:#555}
 .filters button[data-f="food"].on{background:#e8f1ff;border-color:#2b7bff}
 .filters button[data-f="warm"].on{background:#fff1df;border-color:#ff8a1f}
 .filters button[data-f="foodbank"].on{background:#e8ffe8;border-color:#2f9e44}
@@ -19,11 +25,21 @@ html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,sans
 .img{width:min(250px,45vw);height:min(150px,27vw);object-fit:cover;border-radius:6px;flex:0 0 auto;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.7)}
 .img.logo{object-fit:contain;background:#f2f2f2;padding:12px}
 .h{margin:0 0 .25rem;font-size:1rem}.meta{font-size:.85rem;color:#555;margin:.1rem 0}.card ul{margin:.4rem 0 0;padding-left:1.1rem;font-size:.85rem}
-@media(max-width:700px){.img{width:min(160px,45vw);height:min(96px,27vw)}.filters button{font-size:.75rem}}
+.empty{padding:1rem;border:1px dashed #ccc;border-radius:8px;background:#fff;color:#555}
+@media(max-width:700px){.hero{padding:.8rem}.img{width:min(160px,45vw);height:min(96px,27vw)}.filters button{font-size:.75rem}}
 </style></head>
 <body>
+<header class="hero">
+ <h1>Mid Devon Community Map</h1>
+ <p>Discover warm spaces, food support, and community meetups. Use the list view to search and filter, then jump back to the map for directions.</p>
+</header>
 <div class="bar" id="views"><button class="on" data-v="map" type="button">Map</button><button data-v="list" type="button">List</button></div>
-<div class="filters" id="filters"><button class="on" data-f="all" type="button">All</button><button data-f="food" type="button">Food / Drink</button><button data-f="foodbank" type="button">Foodbanks</button><button data-f="warm" type="button">Warm Spaces</button><button data-f="other" type="button">Other</button></div>
+<div class="filters" id="filters">
+ <label for="search">Search</label>
+ <input id="search" type="search" placeholder="Search by name, town, or service" autocomplete="off"/>
+ <button class="on" data-f="all" type="button">All</button><button data-f="food" type="button">Food / Drink</button><button data-f="foodbank" type="button">Foodbanks</button><button data-f="warm" type="button">Warm Spaces</button><button data-f="other" type="button">Other</button>
+ <span class="count" id="count"></span>
+</div>
 <div id="map"></div><div id="list"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -33,6 +49,7 @@ const map=L.map('map').setView([50.9025,-3.4869],11);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
 fetch('https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Local_Authority_Districts_May_2023_UK_BFC_V2/FeatureServer/0/query?where=LAD23NM=%27Mid%20Devon%27&outFields=*&f=geojson')
  .then(r=>r.json()).then(g=>L.geoJSON(g,{style:{color:'#000',weight:3,fillOpacity:0}}).addTo(map)).catch(()=>{});
+setTimeout(()=>map.invalidateSize(),0);
 
 const legend=L.control({position:'bottomright'});
 legend.onAdd=()=>{
@@ -55,13 +72,13 @@ const icon=(c)=>L.icon({iconUrl:`https://maps.gstatic.com/mapfiles/ms2/micons/${
 const I={food:icon('blue'),warm:icon('orange'),foodbank:icon('green'),other:icon('red')};
 
 const POI=[
- {name:"The Living Room (St George's Extension)",venue:"St George’s Church Extension",address_line1:"St George’s Church Extension",address_line2:"Becks Square",town:"Tiverton",postcode:"EX16 6PJ",country:"UK",website:"https://www.tivertonchurch.org/community",list_image_url:"https://static.wixstatic.com/media/b252be_7c034a1ee2dc421c93a508022e2562f8~mv2.png/v1/crop/x_0,y_55,w_1080,h_961/fill/w_490,h_436,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/Copy%20of%20Living%20Room%20Church%20Suite.png",lat:50.901285,lng:-3.487417,services:[{label:"The Living Room community cafe",day:"Tuesday",time:"10:00-12:00",type:"social with refreshments"}]},
+ {name:"The Living Room (St George's Extension)",venue:"St George's Church Extension",address_line1:"St George's Church Extension",address_line2:"Becks Square",town:"Tiverton",postcode:"EX16 6PJ",country:"UK",website:"https://www.tivertonchurch.org/community",list_image_url:"https://static.wixstatic.com/media/b252be_7c034a1ee2dc421c93a508022e2562f8~mv2.png/v1/crop/x_0,y_55,w_1080,h_961/fill/w_490,h_436,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/Copy%20of%20Living%20Room%20Church%20Suite.png",lat:50.901285,lng:-3.487417,services:[{label:"The Living Room community cafe",day:"Tuesday",time:"10:00-12:00",type:"social with refreshments"}]},
  {name:"St Paul's Church, Westexe",venue:"St Paul's Church",address_line1:"Church Street",address_line2:"",town:"Tiverton",postcode:"EX16 5HU",country:"UK",website:"https://www.tivertonchurch.org/",list_image_url:"https://static.wixstatic.com/media/b252be_a5d31e370d1b453882f43144f55e0148~mv2.png/v1/fill/w_161,h_46,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/St%20George%20%26%20St%20Paul.png",lat:50.902523,lng:-3.492419,services:[{label:"Breakfast on the Go",day:"Thursday",time:"07:45-08:45",notes:"term time only",type:"breakfast"},{label:"Lunch on the Go",day:"Thursday",time:"11:30-13:00",type:"lunch"}]},
- {name:"ReRooted Surplus Food Cafe",venue:"St George’s Church Rooms",address_line1:"Fore Street",address_line2:"",town:"Tiverton",postcode:"EX16 6PJ",country:"UK",website:"https://sustainabletiverton.org.uk/projects/food/",list_image_url:"https://sustainabletiverton.org.uk/wp-content/uploads/elementor/thumbs/Final-rerooted-large-scaled-qk551l2k07vtugkr24d4e13529anw1hju29axg8bgg.webp",lat:50.901285,lng:-3.487417,services:[{label:"ReRooted Surplus Food Cafe",day:"Saturday",time:"last Saturday of every month",type:"surplus food cafe"}]},
+ {name:"ReRooted Surplus Food Cafe",venue:"St George's Church Rooms",address_line1:"Fore Street",address_line2:"",town:"Tiverton",postcode:"EX16 6PJ",country:"UK",website:"https://sustainabletiverton.org.uk/projects/food/",list_image_url:"https://sustainabletiverton.org.uk/wp-content/uploads/elementor/thumbs/Final-rerooted-large-scaled-qk551l2k07vtugkr24d4e13529anw1hju29axg8bgg.webp",lat:50.901285,lng:-3.487417,services:[{label:"ReRooted Surplus Food Cafe",day:"Saturday",time:"last Saturday of every month",type:"surplus food cafe"}]},
  {name:"ReROOTed Community Fridge",venue:"Tiverton Library",address_line1:"Phoenix House, Phoenix Lane",address_line2:"(Community Fridge in the library)",town:"Tiverton",postcode:"EX16 6SA",country:"UK",website:"https://sustainabletiverton.org.uk/projects/food/",list_image_url:"https://sustainabletiverton.org.uk/wp-content/uploads/elementor/thumbs/Final-rerooted-large-scaled-qk551l2k07vtugkr24d4e13529anw1hju29axg8bgg.webp",lat:50.90142,lng:-3.485089,services:[{label:"Community Fridge (surplus fresh food)",day:"Mon, Tue, Thu, Fri",time:"Mon/Tue/Thu 10:00-11:30; Fri 13:00-14:30",notes:"One visit per day please",type:"community fridge (foodbank)"}]},
- {name:"Bradninch Community Food Shed",venue:"Bradninch Baptist Church",address_line1:"Millway",address_line2:"",town:"Bradninch",postcode:"EX5 4NL",country:"UK",website:"https://devonconnect.org/activity/bradninch-community-food-shed",list_image_url:"https://devonconnect.org/storage/activities/14344/CrzaYVTPRIXVtW3sFoNBkqZNHk9T3kKNyjtZF8mF.jpg",lat:50.826109,lng:-3.421174,services:[{label:"Community Food Shed",day:"Every day",time:"10:00-18:00",notes:"Open access – help yourself",type:"community fridge / food shed (foodbank)"}]},
- {name:"Crediton Community Food Larder",venue:"Crediton Library",address_line1:"Belle Parade",address_line2:"",town:"Crediton",postcode:"EX17 2AA",country:"UK",website:"https://creditonfoodbank.org.uk/food-parcels/",list_image_url:"https://creditonfoodbank.org.uk/wp-content/uploads/2024/06/Web-Logo-Crediton.jpg",lat:50.791254,lng:-3.656016,services:[{label:"Community Food Larder",day:"Mon, Tue, Fri",time:"Mon 18:00; Tue 10:00–12:00; Fri 10:00–12:00",notes:"Friday requires referral",type:"food parcels (foodbank)"}]},
- {name:"Hemyock Community Fridge",venue:"Blackdown Healthy Living Centre",address_line1:"Riverside",address_line2:"",town:"Hemyock",postcode:"EX15 3SH",country:"UK",website:"https://foodsave.org.uk/hemyock-cf/",list_image_url:"https://bhlac.org.uk/wp-content/uploads/elementor/thumbs/larder-ql5bdxvvqeudt4ndnd1414p3zsx2i4ecpugreh7rsg.jpg",lat:50.918338,lng:-3.224736,services:[{label:"Community Fridge",day:"Mon–Sun",time:"Mon/Thu 09:00–15:00; Tue/Wed/Fri 09:00–13:00; Sat/Sun 12:00–13:00",type:"community fridge (foodbank)"}]},
+ {name:"Bradninch Community Food Shed",venue:"Bradninch Baptist Church",address_line1:"Millway",address_line2:"",town:"Bradninch",postcode:"EX5 4NL",country:"UK",website:"https://devonconnect.org/activity/bradninch-community-food-shed",list_image_url:"https://devonconnect.org/storage/activities/14344/CrzaYVTPRIXVtW3sFoNBkqZNHk9T3kKNyjtZF8mF.jpg",lat:50.826109,lng:-3.421174,services:[{label:"Community Food Shed",day:"Every day",time:"10:00-18:00",notes:"Open access - help yourself",type:"community fridge / food shed (foodbank)"}]},
+ {name:"Crediton Community Food Larder",venue:"Crediton Library",address_line1:"Belle Parade",address_line2:"",town:"Crediton",postcode:"EX17 2AA",country:"UK",website:"https://creditonfoodbank.org.uk/food-parcels/",list_image_url:"https://creditonfoodbank.org.uk/wp-content/uploads/2024/06/Web-Logo-Crediton.jpg",lat:50.791254,lng:-3.656016,services:[{label:"Community Food Larder",day:"Mon, Tue, Fri",time:"Mon 18:00; Tue 10:00-12:00; Fri 10:00-12:00",notes:"Friday requires referral",type:"food parcels (foodbank)"}]},
+ {name:"Hemyock Community Fridge",venue:"Blackdown Healthy Living Centre",address_line1:"Riverside",address_line2:"",town:"Hemyock",postcode:"EX15 3SH",country:"UK",website:"https://foodsave.org.uk/hemyock-cf/",list_image_url:"https://bhlac.org.uk/wp-content/uploads/elementor/thumbs/larder-ql5bdxvvqeudt4ndnd1414p3zsx2i4ecpugreh7rsg.jpg",lat:50.918338,lng:-3.224736,services:[{label:"Community Fridge",day:"Mon-Sun",time:"Mon/Thu 09:00-15:00; Tue/Wed/Fri 09:00-13:00; Sat/Sun 12:00-13:00",type:"community fridge (foodbank)"}]},
  {name:"Silverton Community Larder",venue:"Silverton Community Hall",address_line1:"Wyndham Road",address_line2:"",town:"Silverton",postcode:"EX5 4JZ",country:"UK",website:"https://www.recycledevon.org/community-groups/silverton-community-larder/",lat:50.817578,lng:-3.481533,services:[{label:"Community Larder",day:"Every day",time:"Always open",type:"fridge / larder (foodbank)"}]},
  {name:"Uff Comm Fridge",venue:"Uffculme Surgery (Hub)",address_line1:"Commercial Road",address_line2:"",town:"Uffculme",postcode:"EX15 3EB",country:"UK",website:"https://www.recycledevon.org/community-groups/uff-comm-fridge/",list_image_url:"https://www.recycledevon.org/wp-content/uploads/uff-comm-fridge-768x576.jpg",lat:50.904777,lng:-3.330765,services:[{label:"Community Fridge",day:"Every day",time:"Always open",type:"community fridge (foodbank)"}]},
  {name:"Salvation Army Tiverton",venue:"Salvation Army Hall",address_line1:"Chapel Street",address_line2:"",town:"Tiverton",postcode:"EX16 6DE",country:"UK",website:"https://www.salvationarmy.org.uk/tiverton",list_image_url:"https://www.salvationarmy.org.uk/themes/custom/salvation_army/logo.svg",lat:50.907008,lng:-3.479336,services:[{label:"Tuesday Coffee Morning and Brunch",day:"Tuesday",time:"10:30-12:30",type:"coffee morning and brunch"}]},
@@ -93,7 +110,7 @@ const popup=(loc)=>{
  const a=[loc.address_line1,loc.address_line2,`${loc.town} ${loc.postcode}`].filter(Boolean).join('<br>');
  const svc=(loc.services||[]).map(s=>{
   const bits=[s.day,s.time,s.notes].filter(Boolean).join(', ');
-  return `<li><b>${s.label||''}</b>${bits?` – ${bits}`:''}${s.type?` (${s.type})`:''}</li>`;
+  return `<li><b>${s.label||''}</b>${bits?` - ${bits}`:''}${s.type?` (${s.type})`:''}</li>`;
  }).join('');
  return `<b>${loc.name}</b>${loc.venue&&loc.venue!==loc.name?`<br>${loc.venue}`:''}<br>${a}${loc.website?`<br><a target=_blank href="${loc.website}">Website</a>`:''}${svc?`<hr><ul style="padding-left:1.2em;margin:.5em 0 0">${svc}</ul>`:''}`;
 };
@@ -112,19 +129,36 @@ POI.forEach((loc,i)=>{
 });
 
 let cur='all';
+let query='';
 let listRendered=false; // lazy-render list to avoid loading dozens of images on initial map view
 
 const render=()=>{
  const el=$('#list');
- el.innerHTML=POI.map((loc,i)=>{
-  const c=cat(loc); if(cur!=='all'&&c!==cur)return '';
+ const tokens=query.trim().toLowerCase();
+ const filtered=POI.map((loc,i)=>{
+  const c=cat(loc);
+  if(cur!=='all'&&c!==cur)return null;
+  if(tokens){
+   const serviceText=(loc.services||[]).map(s=>`${s.label||''} ${s.type||''} ${s.day||''} ${s.time||''} ${s.notes||''}`).join(' ').toLowerCase();
+   const hay=[loc.name,loc.venue,loc.address_line1,loc.address_line2,loc.town,loc.postcode,serviceText].filter(Boolean).join(' ').toLowerCase();
+   if(!hay.includes(tokens))return null;
+  }
+  return {loc,i,c};
+ }).filter(Boolean);
+ const countEl=$('#count');
+ if(countEl)countEl.textContent=filtered.length?`${filtered.length} location${filtered.length===1?'':'s'}`:'0 locations';
+ if(!filtered.length){
+  el.innerHTML=`<div class="empty">No locations match your search. Try clearing the search or choosing another filter.</div>`;
+  return;
+ }
+ el.innerHTML=filtered.map(({loc,i,c})=>{
   const u=safeImg(loc.list_image_url)||fbImg(loc,c);
   const isLogo=!!loc.list_image_url&&loc.list_image_url.includes('w_161,h_46');
   const addr=[loc.address_line1,loc.address_line2,`${loc.town} ${loc.postcode}`].filter(Boolean).join(', ');
   const links=`${loc.website?`<a target=_blank href="${loc.website}">Website</a> · `:''}<a href="#" class="vom" data-id="${i}">View on map</a>`;
   const svc=(loc.services||[]).map(s=>{
    const bits=[s.day,s.time,s.notes].filter(Boolean).join(', ');
-   return `<li><b>${s.label||''}</b>${bits?` – ${bits}`:''}${s.type?` (${s.type})`:''}</li>`;
+   return `<li><b>${s.label||''}</b>${bits?` - ${bits}`:''}${s.type?` (${s.type})`:''}</li>`;
   }).join('');
   const img=u?`<img class="img${isLogo?' logo':''}" src="${u}" loading="lazy" referrerpolicy="no-referrer" onerror="if(this.dataset.f)return;this.dataset.f=1;this.onerror=null;const f='${fbImg(loc,c)}';if(this.src!==f)this.src=f;this.classList.remove('logo')">`:'';
   return `<div class="card ${c}">${img}<div style="flex:1;min-width:0"><h3 class="h">${loc.name}</h3>${loc.venue&&loc.venue!==loc.name?`<div class="meta">${loc.venue}</div>`:''}<div class="meta">${addr}</div><div class="meta">${links}</div>${svc?`<ul>${svc}</ul>`:''}</div></div>`;
@@ -151,6 +185,13 @@ $$('#filters button').forEach(b=>b.onclick=()=>{
  cur=b.dataset.f||'all'; $$('#filters button').forEach(x=>x.classList.toggle('on',x===b));
  if(!listRendered)listRendered=true; render();
 });
+
+const searchEl=$('#search');
+if(searchEl){
+ searchEl.addEventListener('input',e=>{
+  query=e.target.value||''; if(!listRendered)listRendered=true; render();
+ });
+}
 
 // tests / guardrails
 console.assert(POI.length>0,'No POIs loaded');
