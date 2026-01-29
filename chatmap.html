@@ -16,10 +16,13 @@ html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,sans
 .filters button{flex:1;padding:.35rem .5rem;border-radius:999px;border:1px solid #ccc;font-size:.8rem;background:#f5f5f5;cursor:pointer}
 .filters button.on{border-width:2px;font-weight:600}
 .filters .count{font-size:.8rem;color:#555}
+.filters.map-view label,.filters.map-view input,.filters.map-view .count{display:none}
+.filters button[data-f="food"]{background:#f2f7ff;border-color:#a8c7ff;color:#1f4bb8}
+.filters button[data-f="warm"]{background:#fff7ed;border-color:#ffd5a6;color:#9a4c00}
+.filters button[data-f="foodbank"]{background:#f1fff1;border-color:#a7e3b5;color:#1e7a35}
 .filters button[data-f="food"].on{background:#e8f1ff;border-color:#2b7bff}
 .filters button[data-f="warm"].on{background:#fff1df;border-color:#ff8a1f}
 .filters button[data-f="foodbank"].on{background:#e8ffe8;border-color:#2f9e44}
-.filters button[data-f="other"].on{background:#f0f0f0;border-color:#999}
 .card{border-radius:6px;border:1px solid #ddd;padding:.75rem .9rem;margin:0 0 .75rem;display:flex;gap:12px;align-items:flex-start;background:#fff}
 .card.food{border-color:#2b7bff;background:#e8f1ff}.card.warm{border-color:#ff8a1f;background:#fff1df}.card.foodbank{border-color:#2f9e44;background:#e8ffe8}.card.other{border-color:#999;background:#f5f5f5}
 .img{width:min(250px,45vw);height:min(150px,27vw);object-fit:cover;border-radius:6px;flex:0 0 auto;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.7)}
@@ -37,7 +40,7 @@ html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,sans
 <div class="filters" id="filters">
  <label for="search">Search</label>
  <input id="search" type="search" placeholder="Search by name, town, or service" autocomplete="off"/>
- <button class="on" data-f="all" type="button">All</button><button data-f="food" type="button">Food / Drink</button><button data-f="foodbank" type="button">Foodbanks</button><button data-f="warm" type="button">Warm Spaces</button><button data-f="other" type="button">Other</button>
+ <button class="on" data-f="all" type="button">All</button><button data-f="food" type="button">Food / Drink</button><button data-f="foodbank" type="button">Foodbanks</button><button data-f="warm" type="button">Warm Spaces</button>
  <span class="count" id="count"></span>
 </div>
 <div id="map"></div><div id="list"></div>
@@ -55,7 +58,7 @@ const legend=L.control({position:'bottomright'});
 legend.onAdd=()=>{
  const d=L.DomUtil.create('div');
  d.style.cssText='background:#fff;padding:8px 12px;border:1px solid #888;border-radius:6px;font:14px/1.2 system-ui';
- d.innerHTML='<b>Legend</b><br><img src="https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png" style="vertical-align:middle"> Food / Drink<br><img src="https://maps.gstatic.com/mapfiles/ms2/micons/orange-dot.png" style="vertical-align:middle"> Warm Space<br><img src="https://maps.gstatic.com/mapfiles/ms2/micons/green-dot.png" style="vertical-align:middle"> Foodbank / Community Fridge<br><img src="https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png" style="vertical-align:middle"> Other';
+ d.innerHTML='<img src="https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png" style="vertical-align:middle"> Food / Drink<br><img src="https://maps.gstatic.com/mapfiles/ms2/micons/orange-dot.png" style="vertical-align:middle"> Warm Space<br><img src="https://maps.gstatic.com/mapfiles/ms2/micons/green-dot.png" style="vertical-align:middle"> Foodbank / Community Fridge';
  return d;
 };
 legend.addTo(map);
@@ -69,7 +72,7 @@ const FALL={
 };
 
 const icon=(c)=>L.icon({iconUrl:`https://maps.gstatic.com/mapfiles/ms2/micons/${c}-dot.png`,iconSize:[32,32],iconAnchor:[16,32],popupAnchor:[0,-28]});
-const I={food:icon('blue'),warm:icon('orange'),foodbank:icon('green'),other:icon('red')};
+const I={food:icon('blue'),warm:icon('orange'),foodbank:icon('green')};
 
 const POI=[
  {name:"The Living Room (St George's Extension)",venue:"St George's Church Extension",address_line1:"St George's Church Extension",address_line2:"Becks Square",town:"Tiverton",postcode:"EX16 6PJ",country:"UK",website:"https://www.tivertonchurch.org/community",list_image_url:"https://static.wixstatic.com/media/b252be_7c034a1ee2dc421c93a508022e2562f8~mv2.png/v1/crop/x_0,y_55,w_1080,h_961/fill/w_490,h_436,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/Copy%20of%20Living%20Room%20Church%20Suite.png",lat:50.901285,lng:-3.487417,services:[{label:"The Living Room community cafe",day:"Tuesday",time:"10:00-12:00",type:"social with refreshments"}]},
@@ -84,7 +87,7 @@ const POI=[
  {name:"Salvation Army Tiverton",venue:"Salvation Army Hall",address_line1:"Chapel Street",address_line2:"",town:"Tiverton",postcode:"EX16 6DE",country:"UK",website:"https://www.salvationarmy.org.uk/tiverton",list_image_url:"https://www.salvationarmy.org.uk/themes/custom/salvation_army/logo.svg",lat:50.907008,lng:-3.479336,services:[{label:"Tuesday Coffee Morning and Brunch",day:"Tuesday",time:"10:30-12:30",type:"coffee morning and brunch"}]},
  {name:"Cullompton Community Centre",venue:"Cullompton Community Centre",address_line1:"Pye Corner",address_line2:"",town:"Cullompton",postcode:"EX15 1JX",country:"UK",website:"https://cullomptoncommunitycentre.org.uk/",list_image_url:FALL.drink,lat:50.855971,lng:-3.391676,services:[{label:"Coffee Morning",day:"Friday",time:"10:00-11:30",type:"coffee morning"}]},
  {name:"King Street Chapel Tiverton",venue:"King Street Chapel",address_line1:"King Street",address_line2:"",town:"Tiverton",postcode:"EX16 5JE",country:"UK",website:"http://www.kingstchapel.org.uk/",list_image_url:"https://www.kingstchapel.org.uk/images/0b26437c06b23cf884dfad6ae2cb1557.jpg",lat:50.901986,lng:-3.49374,services:[{label:"Big Breakfast Sunday",day:"Sunday",time:"10:30-11:30",notes:"every fourth Sunday",type:"breakfast"}]},
- {name:"Witheridge Methodist Church",venue:"Witheridge Methodist Church",address_line1:"West Street",address_line2:"",town:"Witheridge",postcode:"EX16 8AA",country:"UK",website:"https://www.ringsashcircuit.org.uk/",lat:50.917153,lng:-3.703587,services:[{label:"Bacon Bap Coffee Morning",day:"Saturday",time:"10:00-13:00",notes:"1st Saturday of every month",type:"coffee morning"}]},
+ {name:"Witheridge Methodist Church",venue:"Witheridge Methodist Church",address_line1:"West Street",address_line2:"",town:"Witheridge",postcode:"EX16 8AA",country:"UK",website:"https://www.witheridgevoice.org/what-s-on",lat:50.917153,lng:-3.703587,services:[{label:"Bacon Bap Coffee Morning",day:"Saturday",time:"10:00-13:00",notes:"1st Saturday of every month",type:"coffee morning"}]},
  {name:"Hele Lane Methodist Church",venue:"Hele Lane Methodist Church",address_line1:"Hele Lane",address_line2:"Black Dog",town:"Black Dog",postcode:"EX17 4QS",country:"UK",website:"https://www.helelane.org.uk/",lat:50.875292,lng:-3.698421,services:[{label:"Fourth Sunday Feast",day:"Sunday",time:"12:00-13:00",notes:"fourth Sunday of every month",type:"meal"}]},
  {name:"Crediton Congregational Church",venue:"Crediton Congregational Church",address_line1:"98 High Street",address_line2:"",town:"Crediton",postcode:"EX17 3LF",country:"UK",website:"https://www.creditoncongregational.org/",lat:50.791326,lng:-3.661801,services:[{label:"Causeway Coffee Drop-In",day:"Wednesday",time:"10:00-12:00",notes:"for people with learning disabilities, carers and friends",type:"coffee drop-in"},{label:"Coffee and Company",day:"Thursday",time:"10:00-11:30",type:"coffee morning"}]},
  {name:"The Bookery Crediton",venue:"The Bookery",address_line1:"21 High Street",address_line2:"",town:"Crediton",postcode:"EX17 3AH",country:"UK",website:"https://thebookery.org.uk/",lat:50.790443,lng:-3.658779,services:[{label:"Soup and Stories",day:"varies",time:"12:30-14:00",notes:"until 12th Dec",type:"meal and social"},{label:"Community Lunch",day:"Friday",time:"varies",notes:"third Friday of every month",type:"meal"}]},
@@ -122,10 +125,13 @@ const fbImg=(loc,c)=>{
 };
 
 const markers={};
+const markerCats={};
 POI.forEach((loc,i)=>{
  if(typeof loc.lat!=='number'||typeof loc.lng!=='number')return;
  const c=cat(loc);
- markers[i]=L.marker([loc.lat,loc.lng],{icon:I[c]||I.other}).addTo(map).bindPopup(popup(loc));
+ if(c==='other')return;
+ markerCats[i]=c;
+ markers[i]=L.marker([loc.lat,loc.lng],{icon:I[c]}).addTo(map).bindPopup(popup(loc));
 });
 
 let cur='all';
@@ -165,24 +171,46 @@ const render=()=>{
  }).join('');
 };
 
+const applyMapFilter=()=>{
+ Object.entries(markers).forEach(([key,marker])=>{
+  const c=markerCats[key];
+  const show=cur==='all'||c===cur;
+  if(show){
+   if(!map.hasLayer(marker))marker.addTo(map);
+  }else if(map.hasLayer(marker)){
+   map.removeLayer(marker);
+  }
+ });
+};
+
+const filtersEl=$('#filters');
+if(filtersEl){
+ filtersEl.style.display='flex';
+ filtersEl.classList.add('map-view');
+}
+
 $('#list').addEventListener('click',e=>{
  const a=e.target.closest('.vom'); if(!a)return; e.preventDefault();
  const id=a.dataset.id,loc=POI[id],m=markers[id]; if(!loc||!m)return;
  $$('#views button').forEach(b=>b.classList.toggle('on',b.dataset.v==='map'));
- $('#map').style.display='block'; $('#list').style.display='none'; $('#filters').style.display='none';
+ $('#map').style.display='block'; $('#list').style.display='none'; $('#filters').style.display='flex';
+ $('#filters').classList.add('map-view');
  setTimeout(()=>{map.invalidateSize(); map.setView([loc.lat,loc.lng],13); m.openPopup();},0);
 });
 
 $$('#views button').forEach(b=>b.onclick=()=>{
  const v=b.dataset.v; $$('#views button').forEach(x=>x.classList.toggle('on',x===b));
- const onMap=v==='map'; $('#map').style.display=onMap?'block':'none'; $('#list').style.display=onMap?'none':'block';
- $('#filters').style.display=onMap?'none':'flex';
+ const onMap=v==='map';
+ $('#map').style.display=onMap?'block':'none'; $('#list').style.display=onMap?'none':'block';
+ $('#filters').style.display='flex';
+ $('#filters').classList.toggle('map-view',onMap);
  if(!onMap && !listRendered){render(); listRendered=true;}
- if(onMap)setTimeout(()=>map.invalidateSize(),0);
+ if(onMap){applyMapFilter(); setTimeout(()=>map.invalidateSize(),0);}
 });
 
 $$('#filters button').forEach(b=>b.onclick=()=>{
  cur=b.dataset.f||'all'; $$('#filters button').forEach(x=>x.classList.toggle('on',x===b));
+ applyMapFilter();
  if(!listRendered)listRendered=true; render();
 });
 
