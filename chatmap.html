@@ -2,14 +2,14 @@
 <title>Mid Devon Community Map</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
-html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif}body{display:flex;flex-direction:column}
+html,body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif}body{min-height:100%}
 .hero{padding:1rem 1.1rem;background:#102a43;color:#f5f7fb}
 .hero h1{margin:0 0 .25rem;font-size:1.35rem}
 .hero p{margin:0;font-size:.95rem;max-width:60ch;color:#d9e2ef}
 .bar{display:flex;border-bottom:1px solid #ccc;background:#f8f8f8}
 .bar button{flex:1;padding:.7rem .9rem;border:0;background:0;font-size:1rem;cursor:pointer;opacity:.75}
 .bar button.on{background:#fff;border-bottom:3px solid #07c;font-weight:600;opacity:1}
-#map,#list{flex:1;min-height:0}#map{min-height:320px}#list{display:none;overflow:auto;padding:.75rem 1rem;background:#fafafa;box-sizing:border-box}
+#map{min-height:320px;height:60vh}#list{display:none;padding:.75rem 1rem;background:#fafafa;box-sizing:border-box;overflow:visible}
 .filters{display:none;gap:.5rem;padding:.6rem .75rem;border-bottom:1px solid #ddd;background:#fff;flex-wrap:wrap;align-items:center}
 .filters label{font-size:.8rem;color:#333}
 .filters input{flex:1 1 220px;min-width:180px;padding:.4rem .6rem;border:1px solid #ccc;border-radius:6px;font-size:.85rem}
@@ -33,8 +33,9 @@ html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,sans
 @media(max-width:700px){
  .hero{padding:.8rem}
  .bar button{font-size:.95rem}
+ #map{height:auto;aspect-ratio:4/3;min-height:240px}
  #list{padding:.6rem .7rem}
- .filters{position:sticky;top:0;z-index:5;padding:.65rem .7rem}
+ .filters{padding:.65rem .7rem;position:static}
  .filters input{flex:1 1 100%;min-width:0}
  .filters button{flex:1 1 calc(50% - .5rem);font-size:.8rem}
  .card{flex-direction:column;gap:.6rem;padding:.85rem}
