@@ -2,15 +2,15 @@
 <title>Mid Devon Community Map</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
-html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif}body{display:flex;flex-direction:column}
+html,body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif}body{min-height:100%}
 .hero{padding:1rem 1.1rem;background:#102a43;color:#f5f7fb}
 .hero h1{margin:0 0 .25rem;font-size:1.35rem}
 .hero p{margin:0;font-size:.95rem;max-width:60ch;color:#d9e2ef}
 .bar{display:flex;border-bottom:1px solid #ccc;background:#f8f8f8}
-.bar button{flex:1;padding:.6rem .8rem;border:0;background:0;font-size:.95rem;cursor:pointer;opacity:.75}
+.bar button{flex:1;padding:.7rem .9rem;border:0;background:0;font-size:1rem;cursor:pointer;opacity:.75}
 .bar button.on{background:#fff;border-bottom:3px solid #07c;font-weight:600;opacity:1}
-#map,#list{flex:1;min-height:0}#map{min-height:320px}#list{display:none;overflow:auto;padding:.75rem 1rem;background:#fafafa;box-sizing:border-box}
-.filters{display:none;gap:.5rem;padding:.5rem .75rem;border-bottom:1px solid #ddd;background:#fff;flex-wrap:wrap;align-items:center}
+#map{min-height:320px;height:60vh}#list{display:none;padding:.75rem 1rem;background:#fafafa;box-sizing:border-box;overflow:visible}
+.filters{display:none;gap:.5rem;padding:.6rem .75rem;border-bottom:1px solid #ddd;background:#fff;flex-wrap:wrap;align-items:center}
 .filters label{font-size:.8rem;color:#333}
 .filters input{flex:1 1 220px;min-width:180px;padding:.4rem .6rem;border:1px solid #ccc;border-radius:6px;font-size:.85rem}
 .filters button{flex:1;padding:.35rem .5rem;border-radius:999px;border:1px solid #ccc;font-size:.8rem;background:#f5f5f5;cursor:pointer}
@@ -23,13 +23,30 @@ html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,sans
 .filters button[data-f="food"].on{background:#e8f1ff;border-color:#2b7bff}
 .filters button[data-f="warm"].on{background:#fff1df;border-color:#ff8a1f}
 .filters button[data-f="foodbank"].on{background:#e8ffe8;border-color:#2f9e44}
-.card{border-radius:6px;border:1px solid #ddd;padding:.75rem .9rem;margin:0 0 .75rem;display:flex;gap:12px;align-items:flex-start;background:#fff}
+.card{border-radius:10px;border:1px solid #ddd;padding:.85rem 1rem;margin:0 0 .85rem;display:flex;gap:12px;align-items:flex-start;background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.08)}
+.card-body{flex:1;min-width:0}
 .card.food{border-color:#2b7bff;background:#e8f1ff}.card.warm{border-color:#ff8a1f;background:#fff1df}.card.foodbank{border-color:#2f9e44;background:#e8ffe8}.card.other{border-color:#999;background:#f5f5f5}
-.img{width:min(250px,45vw);height:min(150px,27vw);object-fit:cover;border-radius:6px;flex:0 0 auto;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.7)}
+.img{width:min(250px,45vw);height:min(150px,27vw);object-fit:cover;border-radius:8px;flex:0 0 auto;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.7)}
 .img.logo{object-fit:contain;background:#f2f2f2;padding:12px}
 .h{margin:0 0 .25rem;font-size:1rem}.meta{font-size:.85rem;color:#555;margin:.1rem 0}.card ul{margin:.4rem 0 0;padding-left:1.1rem;font-size:.85rem}
 .empty{padding:1rem;border:1px dashed #ccc;border-radius:8px;background:#fff;color:#555}
-@media(max-width:700px){.hero{padding:.8rem}.img{width:min(160px,45vw);height:min(96px,27vw)}.filters button{font-size:.75rem}}
+@media(max-width:700px){
+ .hero{padding:.8rem}
+ .bar button{font-size:.95rem}
+ #map{height:auto;aspect-ratio:4/3;min-height:240px}
+ #list{padding:.6rem .7rem}
+ .filters{padding:.65rem .7rem;position:static}
+ .filters input{flex:1 1 100%;min-width:0}
+ .filters button{flex:1 1 calc(50% - .5rem);font-size:.8rem}
+ .card{flex-direction:column;gap:.6rem;padding:.85rem}
+ .img{width:100%;height:auto;max-height:220px}
+ .meta{font-size:.82rem}
+ .card ul{font-size:.82rem}
+}
+@media(max-width:420px){
+ .filters button{flex:1 1 100%}
+ .bar button{padding:.65rem .6rem}
+}
 </style></head>
 <body>
 <header class="hero">
@@ -166,7 +183,7 @@ const render=()=>{
    return `<li><b>${s.label||''}</b>${bits?` - ${bits}`:''}${s.type?` (${s.type})`:''}</li>`;
   }).join('');
   const img=u?`<img class="img" src="${u}" loading="lazy" referrerpolicy="no-referrer" onerror="if(this.dataset.f)return;this.dataset.f=1;this.onerror=null;const f='${fbImg(loc,c)}';if(this.src!==f)this.src=f;">`:'';
-  return `<div class="card ${c}">${img}<div style="flex:1;min-width:0"><h3 class="h">${loc.name}</h3>${loc.venue&&loc.venue!==loc.name?`<div class="meta">${loc.venue}</div>`:''}<div class="meta">${addr}</div><div class="meta">${links}</div>${svc?`<ul>${svc}</ul>`:''}</div></div>`;
+  return `<div class="card ${c}">${img}<div class="card-body"><h3 class="h">${loc.name}</h3>${loc.venue&&loc.venue!==loc.name?`<div class="meta">${loc.venue}</div>`:''}<div class="meta">${addr}</div><div class="meta">${links}</div>${svc?`<ul>${svc}</ul>`:''}</div></div>`;
  }).join('');
 };
 
