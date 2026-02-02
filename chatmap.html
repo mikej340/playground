@@ -159,14 +159,13 @@ const render=()=>{
  }
  el.innerHTML=filtered.map(({loc,i,c})=>{
   const u=safeImg(loc.list_image_url)||fbImg(loc,c);
-  const isLogo=!!loc.list_image_url&&loc.list_image_url.includes('w_161,h_46');
   const addr=[loc.address_line1,loc.address_line2,`${loc.town} ${loc.postcode}`].filter(Boolean).join(', ');
   const links=`${loc.website?`<a target=_blank href="${loc.website}">Website</a> · `:''}<a href="#" class="vom" data-id="${i}">View on map</a>`;
   const svc=(loc.services||[]).map(s=>{
    const bits=[s.day,s.time,s.notes].filter(Boolean).join(', ');
    return `<li><b>${s.label||''}</b>${bits?` - ${bits}`:''}${s.type?` (${s.type})`:''}</li>`;
   }).join('');
-  const img=u?`<img class="img${isLogo?' logo':''}" src="${u}" loading="lazy" referrerpolicy="no-referrer" onerror="if(this.dataset.f)return;this.dataset.f=1;this.onerror=null;const f='${fbImg(loc,c)}';if(this.src!==f)this.src=f;this.classList.remove('logo')">`:'';
+  const img=u?`<img class="img" src="${u}" loading="lazy" referrerpolicy="no-referrer" onerror="if(this.dataset.f)return;this.dataset.f=1;this.onerror=null;const f='${fbImg(loc,c)}';if(this.src!==f)this.src=f;">`:'';
   return `<div class="card ${c}">${img}<div style="flex:1;min-width:0"><h3 class="h">${loc.name}</h3>${loc.venue&&loc.venue!==loc.name?`<div class="meta">${loc.venue}</div>`:''}<div class="meta">${addr}</div><div class="meta">${links}</div>${svc?`<ul>${svc}</ul>`:''}</div></div>`;
  }).join('');
 };
