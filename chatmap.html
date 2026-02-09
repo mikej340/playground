@@ -27,7 +27,7 @@ html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,sans
 .card.food{border-color:#2b7bff;background:#e8f1ff}.card.warm{border-color:#ff8a1f;background:#fff1df}.card.foodbank{border-color:#2f9e44;background:#e8ffe8}.card.other{border-color:#999;background:#f5f5f5}
 .img{width:min(250px,45vw);height:min(150px,27vw);object-fit:cover;border-radius:6px;flex:0 0 auto;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.7)}
 .img.logo{object-fit:contain;background:#f2f2f2;padding:12px}
-.h{margin:0 0 .25rem;font-size:1rem}.meta{font-size:.85rem;color:#555;margin:.1rem 0}.card ul{margin:.4rem 0 0;padding-left:1.1rem;font-size:.85rem}
+.h{margin:0 0 .25rem;font-size:1rem}.meta{font-size:.85rem;color:#555;margin:.1rem 0}.meta.updated{color:#7a7a7a;font-size:.8rem}.card ul{margin:.4rem 0 0;padding-left:1.1rem;font-size:.85rem}
 .empty{padding:1rem;border:1px dashed #ccc;border-radius:8px;background:#fff;color:#555}
 @media(max-width:700px){.hero{padding:.8rem}.img{width:min(160px,45vw);height:min(96px,27vw)}.filters button{font-size:.75rem}}
 </style></head>
@@ -74,7 +74,7 @@ const FALL={
 const icon=(c)=>L.icon({iconUrl:`https://maps.gstatic.com/mapfiles/ms2/micons/${c}-dot.png`,iconSize:[32,32],iconAnchor:[16,32],popupAnchor:[0,-28]});
 const I={food:icon('blue'),warm:icon('orange'),foodbank:icon('green')};
 
-const LAST_UPDATED='2025-09-25';
+const LAST_UPDATED='2026-01-01';
 
 const POI=[
  {name:"The Living Room (St George's Extension)",venue:"St George's Church Extension",address_line1:"St George's Church Extension",address_line2:"Becks Square",town:"Tiverton",postcode:"EX16 6PJ",country:"UK",website:"https://www.tivertonchurch.org/community",list_image_url:"https://static.wixstatic.com/media/b252be_7c034a1ee2dc421c93a508022e2562f8~mv2.png/v1/crop/x_0,y_55,w_1080,h_961/fill/w_490,h_436,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/Copy%20of%20Living%20Room%20Church%20Suite.png",lat:50.901285,lng:-3.487417,services:[{label:"The Living Room community cafe",day:"Tuesday",time:"10:00-12:00",type:"social with refreshments"}],last_updated:LAST_UPDATED},
@@ -175,7 +175,7 @@ const render=()=>{
    return `<li><b>${s.label||''}</b>${bits?` - ${bits}`:''}${s.type?` (${s.type})`:''}</li>`;
   }).join('');
   const img=u?`<img class="img" src="${u}" loading="lazy" referrerpolicy="no-referrer" onerror="if(this.dataset.f)return;this.dataset.f=1;this.onerror=null;const f='${fbImg(loc,c)}';if(this.src!==f)this.src=f;">`:'';
-  return `<div class="card ${c}">${img}<div style="flex:1;min-width:0"><h3 class="h">${loc.name}</h3>${loc.venue&&loc.venue!==loc.name?`<div class="meta">${loc.venue}</div>`:''}<div class="meta">${addr}</div><div class="meta">${links}</div>${updated?`<div class="meta">Last updated: ${updated}</div>`:''}${svc?`<ul>${svc}</ul>`:''}</div></div>`;
+  return `<div class="card ${c}">${img}<div style="flex:1;min-width:0"><h3 class="h">${loc.name}</h3>${loc.venue&&loc.venue!==loc.name?`<div class="meta">${loc.venue}</div>`:''}<div class="meta">${addr}</div><div class="meta">${links}</div>${svc?`<ul>${svc}</ul>`:''}${updated?`<div class="meta updated">Last updated: ${updated}</div>`:''}</div></div>`;
  }).join('');
 };
 
