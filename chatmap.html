@@ -22,11 +22,11 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background
 #map,#list{flex:1;min-height:0}
 #map{min-height:420px;background:#dce6ef}
 #list{display:none;overflow:auto;padding:.85rem;background:#eef3f8;box-sizing:border-box}
-.card{border-radius:.75rem;border:1px solid #d6dde6;padding:.85rem;margin:0 0 .85rem;display:flex;flex-direction:row-reverse;gap:12px;align-items:flex-start;background:#fff;box-shadow:var(--card-shadow)}
-.card.food{border-color:#2b7bff;background:#eef5ff}
-.card.warm{border-color:#ff8a1f;background:#fff4e8}
-.card.foodbank{border-color:#2f9e44;background:#ebffed}
-.card.other{border-color:#999;background:#f5f5f5}
+.poi-card{border-radius:.75rem;border:1px solid #d6dde6;padding:.85rem;margin:0 0 .85rem;display:flex;flex-direction:row-reverse;gap:12px;align-items:flex-start;background:#fff;box-shadow:var(--card-shadow)}
+.poi-card.food{border-color:#2b7bff;background:#eef5ff}
+.poi-card.warm{border-color:#ff8a1f;background:#fff4e8}
+.poi-card.foodbank{border-color:#2f9e44;background:#ebffed}
+.poi-card.other{border-color:#999;background:#f5f5f5}
 .img{width:min(250px,36vw);height:min(150px,24vw);object-fit:cover;border-radius:.6rem;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.7);flex:0 0 auto;align-self:flex-start}
 .img.logo{object-fit:contain;background:#f2f2f2;padding:12px}
 .card-copy{flex:1;min-width:0}
@@ -34,11 +34,11 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background
 .h{margin:0 0 .25rem;font-size:1.02rem}
 .meta{font-size:.88rem;color:#486581;margin:.1rem 0}
 .meta.updated{color:#627d98;font-size:.8rem;margin-top:1rem}
-.card ul{margin:.45rem 0 0;padding-left:1.1rem;font-size:.86rem}
+.poi-card ul{margin:.45rem 0 0;padding-left:1.1rem;font-size:.86rem}
 .empty{padding:1rem;border:1px dashed #afbccb;border-radius:8px;background:#fff;color:#486581}
 @media(max-width:900px){#map{min-height:58vh}}
 @media(max-width:700px){
- .card{flex-direction:column;padding:.78rem}
+ .poi-card{flex-direction:column;padding:.78rem}
  .img{width:100%;height:180px;max-height:42vw;align-self:stretch}
  .card-copy{order:2}
  #list{padding:.65rem}
@@ -201,7 +201,7 @@ const render=()=>{
    return `<li><b>${s.label||''}</b>${bits?` - ${bits}`:''}${s.type?` (${s.type})`:''}</li>`;
   }).join('');
   const img=u?`<img class="img" src="${u}" loading="lazy" referrerpolicy="no-referrer" onerror="if(this.dataset.f)return;this.dataset.f=1;this.onerror=null;const f='${fbImg(loc,c)}';if(this.src!==f)this.src=f;">`:'';
-  return `<div class="card ${c}">${img}<div class="card-copy"><h3 class="h">${loc.name}</h3>${loc.venue&&loc.venue!==loc.name?`<div class="meta">${loc.venue}</div>`:''}<div class="meta">${addr}</div><div class="meta">${links}</div>${svc?`<ul>${svc}</ul>`:''}${updated?`<div class="meta updated">Last updated: ${updated}</div>`:''}</div></div>`;
+  return `<div class="poi-card ${c}">${img}<div class="card-copy"><h3 class="h">${loc.name}</h3>${loc.venue&&loc.venue!==loc.name?`<div class="meta">${loc.venue}</div>`:''}<div class="meta">${addr}</div><div class="meta">${links}</div>${svc?`<ul>${svc}</ul>`:''}${updated?`<div class="meta updated">Last updated: ${updated}</div>`:''}</div></div>`;
  }).join('');
 };
 
