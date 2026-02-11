@@ -74,7 +74,9 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background
 <script>
 (()=>{
 const $=(s,el=document)=>el.querySelector(s),$$=(s,el=document)=>[...el.querySelectorAll(s)];
-const map=L.map('map').setView([50.9025,-3.4869],11);
+const center=[50.9025,-3.4869];
+const defaultZoom=window.matchMedia('(max-width:700px)').matches?9:11;
+const map=L.map('map').setView(center,defaultZoom);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
 fetch('https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Local_Authority_Districts_May_2023_UK_BFC_V2/FeatureServer/0/query?where=LAD23NM=%27Mid%20Devon%27&outFields=*&f=geojson')
  .then(r=>r.json()).then(g=>L.geoJSON(g,{style:{color:'#000',weight:3,fillOpacity:0}}).addTo(map)).catch(()=>{});
