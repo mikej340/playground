@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Mid Devon Community Map</title>
+<title>CHAT Map - Food and Warm Places</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
@@ -11,9 +11,6 @@
 html,body{height:100%}
 body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:var(--page-bg);display:flex;flex-direction:column}
 .topbar{z-index:1020}
-.hero{background:linear-gradient(140deg,#102a43,#1f4f78);color:#f5f7fb}
-.hero h1{margin:0 0 .25rem;font-size:clamp(1.2rem,2.4vw,1.5rem)}
-.hero p{margin:0;max-width:70ch;color:#d9e2ef;font-size:.95rem}
 .main-shell{display:flex;flex-direction:column;flex:1;min-height:0}
 #views .btn.on{background:#0d6efd;color:#fff;border-color:#0d6efd}
 .filters{display:none;flex-direction:column;gap:.25rem}
@@ -47,10 +44,6 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background
 </head>
 <body>
 <div class="topbar sticky-top shadow-sm">
- <header class="hero px-3 py-3 py-sm-2">
-  <h1>Mid Devon Community Map</h1>
-  <p>Discover warm spaces, food support, and community meetups. Use the list view to search and filter, then jump back to the map for directions.</p>
- </header>
  <div class="bg-white border-bottom px-2 py-2">
   <div class="btn-group w-100" id="views" role="tablist" aria-label="Map and list view switcher">
    <button class="btn btn-outline-primary on" data-v="map" type="button" aria-pressed="true">Map</button>
@@ -58,8 +51,7 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background
   </div>
   <div class="filters pt-2" id="filters">
    <div class="search-wrap d-flex flex-wrap gap-2 align-items-center w-100">
-    <label for="search" class="form-label m-0 small text-secondary">Search</label>
-    <input id="search" class="form-control form-control-sm" type="search" placeholder="Search by name, town, or service" autocomplete="off"/>
+    <input id="search" class="form-control form-control-sm" type="search" placeholder="Search by name, town, or service" aria-label="Search by name, town, or service" autocomplete="off"/>
    </div>
    <div class="d-flex flex-wrap gap-2 align-items-center w-100 mt-2">
     <button class="btn btn-sm btn-outline-secondary rounded-pill on" data-f="all" type="button">All</button>
