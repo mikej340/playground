@@ -10,26 +10,18 @@
 :root{--page-bg:#f6f8fb;--card-shadow:0 1px 3px rgba(16,42,67,.08)}
 html,body{height:100%}
 body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:var(--page-bg);display:flex;flex-direction:column}
-.hero{padding:1rem 1.1rem;background:linear-gradient(140deg,#102a43,#1f4f78);color:#f5f7fb}
+.topbar{z-index:1020}
+.hero{background:linear-gradient(140deg,#102a43,#1f4f78);color:#f5f7fb}
 .hero h1{margin:0 0 .25rem;font-size:clamp(1.2rem,2.4vw,1.5rem)}
 .hero p{margin:0;max-width:70ch;color:#d9e2ef;font-size:.95rem}
 .main-shell{display:flex;flex-direction:column;flex:1;min-height:0}
-.bar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.45rem;padding:.65rem .75rem;border-bottom:1px solid #d6dde6;background:#fff}
-.bar button{padding:.58rem .8rem;border:1px solid #b7c3d0;border-radius:.55rem;background:#f8fafc;font-size:.95rem;cursor:pointer;opacity:.85;font-weight:500}
-.bar button.on{background:#0d6efd;color:#fff;border-color:#0d6efd;opacity:1;box-shadow:var(--card-shadow)}
-.filters{display:none;gap:.5rem;padding:.65rem .75rem;border-bottom:1px solid #d6dde6;background:#fff;flex-wrap:wrap;align-items:center}
-.filters label{font-size:.82rem;color:#334e68;margin:0}
-.filters input{flex:1 1 220px;min-width:180px;padding:.45rem .7rem;border:1px solid #b8c4d2;border-radius:.55rem;font-size:.9rem}
-.filters button{padding:.38rem .65rem;border-radius:999px;border:1px solid #bcc7d3;font-size:.8rem;background:#f8fafc;cursor:pointer}
-.filters button.on{border-width:2px;font-weight:600}
-.filters .count{font-size:.8rem;color:#486581;margin-left:auto}
-.filters.map-view label,.filters.map-view input,.filters.map-view .count{display:none}
-.filters button[data-f="food"]{background:#f2f7ff;border-color:#a8c7ff;color:#1f4bb8}
-.filters button[data-f="warm"]{background:#fff7ed;border-color:#ffd5a6;color:#9a4c00}
-.filters button[data-f="foodbank"]{background:#f1fff1;border-color:#a7e3b5;color:#1e7a35}
-.filters button[data-f="food"].on{background:#e8f1ff;border-color:#2b7bff}
-.filters button[data-f="warm"].on{background:#fff1df;border-color:#ff8a1f}
-.filters button[data-f="foodbank"].on{background:#e8ffe8;border-color:#2f9e44}
+#views .btn.on{background:#0d6efd;color:#fff;border-color:#0d6efd}
+.filters{display:none;flex-direction:column;gap:.25rem}
+.filters.map-view .search-wrap,.filters.map-view #count{display:none!important}
+.filters [data-f="food"]{background:#f2f7ff;border-color:#a8c7ff;color:#1f4bb8}
+.filters [data-f="warm"]{background:#fff7ed;border-color:#ffd5a6;color:#9a4c00}
+.filters [data-f="foodbank"]{background:#f1fff1;border-color:#a7e3b5;color:#1e7a35}
+.filters .btn.on{font-weight:600;border-width:2px}
 #map,#list{flex:1;min-height:0}
 #map{min-height:420px;background:#dce6ef}
 #list{display:none;overflow:auto;padding:.85rem;background:#eef3f8;box-sizing:border-box}
@@ -47,11 +39,6 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background
 .empty{padding:1rem;border:1px dashed #afbccb;border-radius:8px;background:#fff;color:#486581}
 @media(max-width:900px){#map{min-height:58vh}}
 @media(max-width:700px){
- .hero{padding:.85rem .9rem}
- .bar{padding:.55rem .6rem}
- .filters{padding:.6rem}
- .filters input{flex:1 1 100%;min-width:100%}
- .filters .count{margin-left:0;width:100%}
  .card{flex-direction:column;padding:.78rem}
  .img{width:100%;height:180px;max-height:42vw}
  #list{padding:.65rem}
@@ -59,21 +46,32 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background
 </style>
 </head>
 <body>
-<header class="hero">
- <h1>Mid Devon Community Map</h1>
- <p>Discover warm spaces, food support, and community meetups. Use the list view to search and filter, then jump back to the map for directions.</p>
-</header>
+<div class="topbar sticky-top shadow-sm">
+ <header class="hero px-3 py-3 py-sm-2">
+  <h1>Mid Devon Community Map</h1>
+  <p>Discover warm spaces, food support, and community meetups. Use the list view to search and filter, then jump back to the map for directions.</p>
+ </header>
+ <div class="bg-white border-bottom px-2 py-2">
+  <div class="btn-group w-100" id="views" role="tablist" aria-label="Map and list view switcher">
+   <button class="btn btn-outline-primary on" data-v="map" type="button" aria-pressed="true">Map</button>
+   <button class="btn btn-outline-primary" data-v="list" type="button" aria-pressed="false">List</button>
+  </div>
+  <div class="filters pt-2" id="filters">
+   <div class="search-wrap d-flex flex-wrap gap-2 align-items-center w-100">
+    <label for="search" class="form-label m-0 small text-secondary">Search</label>
+    <input id="search" class="form-control form-control-sm" type="search" placeholder="Search by name, town, or service" autocomplete="off"/>
+   </div>
+   <div class="d-flex flex-wrap gap-2 align-items-center w-100 mt-2">
+    <button class="btn btn-sm btn-outline-secondary rounded-pill on" data-f="all" type="button">All</button>
+    <button class="btn btn-sm btn-outline-secondary rounded-pill" data-f="food" type="button">Food / Drink</button>
+    <button class="btn btn-sm btn-outline-secondary rounded-pill" data-f="foodbank" type="button">Foodbanks</button>
+    <button class="btn btn-sm btn-outline-secondary rounded-pill" data-f="warm" type="button">Warm Spaces</button>
+    <span class="count small text-secondary ms-auto" id="count"></span>
+   </div>
+  </div>
+ </div>
+</div>
 <main class="main-shell">
- <div class="bar" id="views" role="tablist" aria-label="Map and list view switcher">
-  <button class="on" data-v="map" type="button" aria-pressed="true">Map</button>
-  <button data-v="list" type="button" aria-pressed="false">List</button>
- </div>
- <div class="filters" id="filters">
-  <label for="search">Search</label>
-  <input id="search" type="search" placeholder="Search by name, town, or service" autocomplete="off"/>
-  <button class="on" data-f="all" type="button">All</button><button data-f="food" type="button">Food / Drink</button><button data-f="foodbank" type="button">Foodbanks</button><button data-f="warm" type="button">Warm Spaces</button>
-  <span class="count" id="count"></span>
- </div>
  <div id="map"></div>
  <div id="list"></div>
 </main>
@@ -224,6 +222,18 @@ const applyMapFilter=()=>{
  });
 };
 
+const setActiveView=(view)=>{
+ $$('#views button').forEach(btn=>{
+  const active=btn.dataset.v===view;
+  btn.classList.toggle('on',active);
+  btn.setAttribute('aria-pressed',active?'true':'false');
+ });
+};
+
+const setActiveFilter=(filter)=>{
+ $$('#filters button').forEach(btn=>btn.classList.toggle('on',(btn.dataset.f||'all')===filter));
+};
+
 const filtersEl=$('#filters');
 if(filtersEl){
  filtersEl.style.display='flex';
@@ -233,14 +243,14 @@ if(filtersEl){
 $('#list').addEventListener('click',e=>{
  const a=e.target.closest('.vom'); if(!a)return; e.preventDefault();
  const id=a.dataset.id,loc=POI[id],m=markers[id]; if(!loc||!m)return;
- $$('#views button').forEach(b=>{const active=b.dataset.v==='map';b.classList.toggle('on',active);b.setAttribute('aria-pressed',active?'true':'false');});
+ setActiveView('map');
  $('#map').style.display='block'; $('#list').style.display='none'; $('#filters').style.display='flex';
  $('#filters').classList.add('map-view');
  setTimeout(()=>{map.invalidateSize(); map.setView([loc.lat,loc.lng],13); m.openPopup();},0);
 });
 
 $$('#views button').forEach(b=>b.onclick=()=>{
- const v=b.dataset.v; $$('#views button').forEach(x=>{const active=x===b;x.classList.toggle('on',active);x.setAttribute('aria-pressed',active?'true':'false');});
+ const v=b.dataset.v; setActiveView(v);
  const onMap=v==='map';
  $('#map').style.display=onMap?'block':'none'; $('#list').style.display=onMap?'none':'block';
  $('#filters').style.display='flex';
@@ -250,7 +260,7 @@ $$('#views button').forEach(b=>b.onclick=()=>{
 });
 
 $$('#filters button').forEach(b=>b.onclick=()=>{
- cur=b.dataset.f||'all'; $$('#filters button').forEach(x=>x.classList.toggle('on',x===b));
+ cur=b.dataset.f||'all'; setActiveFilter(cur);
  applyMapFilter();
  if(!listRendered)listRendered=true; render();
 });
