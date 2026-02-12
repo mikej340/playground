@@ -46,13 +46,15 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background
 </head>
 <body>
 <div class="topbar sticky-top shadow-sm">
- <nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom">
+ <nav class="navbar navbar-expand-lg bg-body-tertiary" data-bs-theme="dark">
   <div class="container-fluid">
    <a class="navbar-brand" href="#">CHAT Map</a>
-   <ul class="navbar-nav" id="views" aria-label="Map and list view switcher">
-    <li class="nav-item"><a class="nav-link active" data-v="map" href="#" aria-current="page">Map</a></li>
-    <li class="nav-item"><a class="nav-link" data-v="list" href="#">List</a></li>
-   </ul>
+   <div class="collapse navbar-collapse" id="navbarSupportedContent">
+    <ul class="navbar-nav me-auto mb-2 mb-lg-0" id="views" aria-label="Map and list view switcher">
+     <li class="nav-item"><a class="nav-link active" data-v="map" href="#" aria-current="page">Map View</a></li>
+     <li class="nav-item"><a class="nav-link" data-v="list" href="#">List View</a></li>
+    </ul>
+   </div>
   </div>
  </nav>
  <div class="bg-white border-bottom px-2 py-2">
