@@ -46,15 +46,13 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background
 </head>
 <body>
 <div class="topbar sticky-top shadow-sm">
- <nav class="navbar navbar-expand bg-white border-bottom px-2 py-2">
+ <nav class="navbar bg-white border-bottom px-2 py-2">
   <div class="container-fluid px-0 justify-content-start">
-   <div class="d-flex align-items-center gap-2">
-    <span class="navbar-brand mb-0 h1 fs-6 me-1">CHAT Map</span>
-    <ul class="navbar-nav flex-row" id="views" aria-label="Map and list view switcher">
-     <li class="nav-item"><a class="nav-link px-2 active text-primary border-bottom border-2 border-primary" data-v="map" href="#" aria-current="page">Map</a></li>
-     <li class="nav-item"><a class="nav-link px-2 text-body-secondary" data-v="list" href="#">List</a></li>
-    </ul>
-   </div>
+   <span class="navbar-brand mb-0 h1 fs-6">CHAT Map</span>
+   <ul class="navbar-nav flex-row ms-2" id="views" aria-label="Map and list view switcher">
+    <li class="nav-item"><a class="nav-link active" data-v="map" href="#" aria-current="page">Map</a></li>
+    <li class="nav-item"><a class="nav-link" data-v="list" href="#">List</a></li>
+   </ul>
   </div>
  </nav>
  <div class="bg-white border-bottom px-2 py-2">
@@ -229,11 +227,6 @@ const setActiveView=(view)=>{
  $$('#views [data-v]').forEach(link=>{
   const active=link.dataset.v===view;
   link.classList.toggle('active',active);
-  link.classList.toggle('text-primary',active);
-  link.classList.toggle('border-bottom',active);
-  link.classList.toggle('border-2',active);
-  link.classList.toggle('border-primary',active);
-  link.classList.toggle('text-body-secondary',!active);
   if(active){
    link.setAttribute('aria-current','page');
   }else{
