@@ -1,54 +1,82 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Mid Devon Community Map</title>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>CHAT Map - Food and Warm Places</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
-html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif}body{display:flex;flex-direction:column}
-.hero{padding:1rem 1.1rem;background:#102a43;color:#f5f7fb}
-.hero h1{margin:0 0 .25rem;font-size:1.35rem}
-.hero p{margin:0;font-size:.95rem;max-width:60ch;color:#d9e2ef}
-.bar{display:flex;border-bottom:1px solid #ccc;background:#f8f8f8}
-.bar button{flex:1;padding:.6rem .8rem;border:0;background:0;font-size:.95rem;cursor:pointer;opacity:.75}
-.bar button.on{background:#fff;border-bottom:3px solid #07c;font-weight:600;opacity:1}
-#map,#list{flex:1;min-height:0}#map{min-height:320px}#list{display:none;overflow:auto;padding:.75rem 1rem;background:#fafafa;box-sizing:border-box}
-.filters{display:none;gap:.5rem;padding:.5rem .75rem;border-bottom:1px solid #ddd;background:#fff;flex-wrap:wrap;align-items:center}
-.filters label{font-size:.8rem;color:#333}
-.filters input{flex:1 1 220px;min-width:180px;padding:.4rem .6rem;border:1px solid #ccc;border-radius:6px;font-size:.85rem}
-.filters button{flex:1;padding:.35rem .5rem;border-radius:999px;border:1px solid #ccc;font-size:.8rem;background:#f5f5f5;cursor:pointer}
-.filters button.on{border-width:2px;font-weight:600}
-.filters .count{font-size:.8rem;color:#555}
-.filters.map-view label,.filters.map-view input,.filters.map-view .count{display:none}
-.filters button[data-f="food"]{background:#f2f7ff;border-color:#a8c7ff;color:#1f4bb8}
-.filters button[data-f="warm"]{background:#fff7ed;border-color:#ffd5a6;color:#9a4c00}
-.filters button[data-f="foodbank"]{background:#f1fff1;border-color:#a7e3b5;color:#1e7a35}
-.filters button[data-f="food"].on{background:#e8f1ff;border-color:#2b7bff}
-.filters button[data-f="warm"].on{background:#fff1df;border-color:#ff8a1f}
-.filters button[data-f="foodbank"].on{background:#e8ffe8;border-color:#2f9e44}
-.card{border-radius:6px;border:1px solid #ddd;padding:.75rem .9rem;margin:0 0 .75rem;display:flex;gap:12px;align-items:flex-start;background:#fff}
-.card.food{border-color:#2b7bff;background:#e8f1ff}.card.warm{border-color:#ff8a1f;background:#fff1df}.card.foodbank{border-color:#2f9e44;background:#e8ffe8}.card.other{border-color:#999;background:#f5f5f5}
-.img{width:min(250px,45vw);height:min(150px,27vw);object-fit:cover;border-radius:6px;flex:0 0 auto;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.7)}
+:root{--page-bg:#f6f8fb;--card-shadow:0 1px 3px rgba(16,42,67,.08)}
+html,body{height:100%}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:var(--page-bg);display:flex;flex-direction:column}
+.topbar{z-index:1020}
+.main-shell{display:flex;flex-direction:column;flex:1;min-height:0}
+#views .btn.on{background:#0d6efd;color:#fff;border-color:#0d6efd}
+.filters{display:none;flex-direction:column;gap:.25rem}
+.filters.map-view .search-wrap,.filters.map-view #count{display:none!important}
+.filters [data-f="food"]{background:#f2f7ff;border-color:#a8c7ff;color:#1f4bb8}
+.filters [data-f="warm"]{background:#fff7ed;border-color:#ffd5a6;color:#9a4c00}
+.filters [data-f="foodbank"]{background:#f1fff1;border-color:#a7e3b5;color:#1e7a35}
+.filters .btn.on{font-weight:600;border-width:2px}
+#map,#list{flex:1;min-height:0}
+#map{min-height:420px;background:#dce6ef}
+#list{display:none;overflow:auto;padding:.85rem;background:#eef3f8;box-sizing:border-box}
+.poi-card{border-radius:.75rem;border:1px solid #d6dde6;padding:.85rem;margin:0 0 .85rem;display:flex;flex-direction:row-reverse;gap:12px;align-items:flex-start;background:#fff;box-shadow:var(--card-shadow)}
+.poi-card.food{border-color:#2b7bff;background:#eef5ff}
+.poi-card.warm{border-color:#ff8a1f;background:#fff4e8}
+.poi-card.foodbank{border-color:#2f9e44;background:#ebffed}
+.poi-card.other{border-color:#999;background:#f5f5f5}
+.img{width:min(250px,36vw);height:min(150px,24vw);object-fit:cover;border-radius:.6rem;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.7);flex:0 0 auto;align-self:flex-start}
 .img.logo{object-fit:contain;background:#f2f2f2;padding:12px}
-.h{margin:0 0 .25rem;font-size:1rem}.meta{font-size:.85rem;color:#555;margin:.1rem 0}.meta.updated{color:#7a7a7a;font-size:.8rem;margin-top:1rem}.card ul{margin:.4rem 0 0;padding-left:1.1rem;font-size:.85rem}
-.empty{padding:1rem;border:1px dashed #ccc;border-radius:8px;background:#fff;color:#555}
-@media(max-width:700px){.hero{padding:.8rem}.img{width:min(160px,45vw);height:min(96px,27vw)}.filters button{font-size:.75rem}}
-</style></head>
+.card-copy{flex:1;min-width:0}
+
+.h{margin:0 0 .25rem;font-size:1.02rem}
+.meta{font-size:.88rem;color:#486581;margin:.1rem 0}
+.meta.updated{color:#627d98;font-size:.8rem;margin-top:1rem}
+.poi-card ul{margin:.45rem 0 0;padding-left:1.1rem;font-size:.86rem}
+.empty{padding:1rem;border:1px dashed #afbccb;border-radius:8px;background:#fff;color:#486581}
+@media(max-width:900px){#map{min-height:58vh}}
+@media(max-width:700px){
+ .poi-card{flex-direction:column;padding:.78rem}
+ .img{width:100%;height:180px;max-height:42vw;align-self:stretch}
+ .card-copy{order:2}
+ #list{padding:.65rem}
+}
+</style>
+</head>
 <body>
-<header class="hero">
- <h1>Mid Devon Community Map</h1>
- <p>Discover warm spaces, food support, and community meetups. Use the list view to search and filter, then jump back to the map for directions.</p>
-</header>
-<div class="bar" id="views"><button class="on" data-v="map" type="button">Map</button><button data-v="list" type="button">List</button></div>
-<div class="filters" id="filters">
- <label for="search">Search</label>
- <input id="search" type="search" placeholder="Search by name, town, or service" autocomplete="off"/>
- <button class="on" data-f="all" type="button">All</button><button data-f="food" type="button">Food / Drink</button><button data-f="foodbank" type="button">Foodbanks</button><button data-f="warm" type="button">Warm Spaces</button>
- <span class="count" id="count"></span>
+<div class="topbar sticky-top shadow-sm">
+ <div class="bg-white border-bottom px-2 py-2">
+  <div class="btn-group w-100" id="views" role="tablist" aria-label="Map and list view switcher">
+   <button class="btn btn-outline-primary on" data-v="map" type="button" aria-pressed="true">Map</button>
+   <button class="btn btn-outline-primary" data-v="list" type="button" aria-pressed="false">List</button>
+  </div>
+  <div class="filters pt-2" id="filters">
+   <div class="search-wrap d-flex flex-wrap gap-2 align-items-center w-100">
+    <input id="search" class="form-control form-control-sm" type="search" placeholder="Search by name, town, or service" aria-label="Search by name, town, or service" autocomplete="off"/>
+   </div>
+   <div class="d-flex flex-wrap gap-2 align-items-center w-100 mt-2">
+    <button class="btn btn-sm btn-outline-secondary rounded-pill on" data-f="all" type="button">All</button>
+    <button class="btn btn-sm btn-outline-secondary rounded-pill" data-f="food" type="button">Food / Drink</button>
+    <button class="btn btn-sm btn-outline-secondary rounded-pill" data-f="foodbank" type="button">Foodbanks</button>
+    <button class="btn btn-sm btn-outline-secondary rounded-pill" data-f="warm" type="button">Warm Spaces</button>
+    <span class="count small text-secondary ms-auto" id="count"></span>
+   </div>
+  </div>
+ </div>
 </div>
-<div id="map"></div><div id="list"></div>
+<main class="main-shell">
+ <div id="map"></div>
+ <div id="list"></div>
+</main>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (()=>{
 const $=(s,el=document)=>el.querySelector(s),$$=(s,el=document)=>[...el.querySelectorAll(s)];
-const map=L.map('map').setView([50.9025,-3.4869],11);
+const center=[50.9025,-3.4869];
+const defaultZoom=window.matchMedia('(max-width:700px)').matches?9:11;
+const map=L.map('map').setView(center,defaultZoom);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
 fetch('https://services1.arcgis.com/ESMARspQHYMw9BZ9/arcgis/rest/services/Local_Authority_Districts_May_2023_UK_BFC_V2/FeatureServer/0/query?where=LAD23NM=%27Mid%20Devon%27&outFields=*&f=geojson')
  .then(r=>r.json()).then(g=>L.geoJSON(g,{style:{color:'#000',weight:3,fillOpacity:0}}).addTo(map)).catch(()=>{});
@@ -175,7 +203,7 @@ const render=()=>{
    return `<li><b>${s.label||''}</b>${bits?` - ${bits}`:''}${s.type?` (${s.type})`:''}</li>`;
   }).join('');
   const img=u?`<img class="img" src="${u}" loading="lazy" referrerpolicy="no-referrer" onerror="if(this.dataset.f)return;this.dataset.f=1;this.onerror=null;const f='${fbImg(loc,c)}';if(this.src!==f)this.src=f;">`:'';
-  return `<div class="card ${c}">${img}<div style="flex:1;min-width:0"><h3 class="h">${loc.name}</h3>${loc.venue&&loc.venue!==loc.name?`<div class="meta">${loc.venue}</div>`:''}<div class="meta">${addr}</div><div class="meta">${links}</div>${svc?`<ul>${svc}</ul>`:''}${updated?`<div class="meta updated">Last updated: ${updated}</div>`:''}</div></div>`;
+  return `<div class="poi-card ${c}">${img}<div class="card-copy"><h3 class="h">${loc.name}</h3>${loc.venue&&loc.venue!==loc.name?`<div class="meta">${loc.venue}</div>`:''}<div class="meta">${addr}</div><div class="meta">${links}</div>${svc?`<ul>${svc}</ul>`:''}${updated?`<div class="meta updated">Last updated: ${updated}</div>`:''}</div></div>`;
  }).join('');
 };
 
@@ -191,6 +219,18 @@ const applyMapFilter=()=>{
  });
 };
 
+const setActiveView=(view)=>{
+ $$('#views button').forEach(btn=>{
+  const active=btn.dataset.v===view;
+  btn.classList.toggle('on',active);
+  btn.setAttribute('aria-pressed',active?'true':'false');
+ });
+};
+
+const setActiveFilter=(filter)=>{
+ $$('#filters button').forEach(btn=>btn.classList.toggle('on',(btn.dataset.f||'all')===filter));
+};
+
 const filtersEl=$('#filters');
 if(filtersEl){
  filtersEl.style.display='flex';
@@ -200,14 +240,14 @@ if(filtersEl){
 $('#list').addEventListener('click',e=>{
  const a=e.target.closest('.vom'); if(!a)return; e.preventDefault();
  const id=a.dataset.id,loc=POI[id],m=markers[id]; if(!loc||!m)return;
- $$('#views button').forEach(b=>b.classList.toggle('on',b.dataset.v==='map'));
+ setActiveView('map');
  $('#map').style.display='block'; $('#list').style.display='none'; $('#filters').style.display='flex';
  $('#filters').classList.add('map-view');
  setTimeout(()=>{map.invalidateSize(); map.setView([loc.lat,loc.lng],13); m.openPopup();},0);
 });
 
 $$('#views button').forEach(b=>b.onclick=()=>{
- const v=b.dataset.v; $$('#views button').forEach(x=>x.classList.toggle('on',x===b));
+ const v=b.dataset.v; setActiveView(v);
  const onMap=v==='map';
  $('#map').style.display=onMap?'block':'none'; $('#list').style.display=onMap?'none':'block';
  $('#filters').style.display='flex';
@@ -217,7 +257,7 @@ $$('#views button').forEach(b=>b.onclick=()=>{
 });
 
 $$('#filters button').forEach(b=>b.onclick=()=>{
- cur=b.dataset.f||'all'; $$('#filters button').forEach(x=>x.classList.toggle('on',x===b));
+ cur=b.dataset.f||'all'; setActiveFilter(cur);
  applyMapFilter();
  if(!listRendered)listRendered=true; render();
 });
