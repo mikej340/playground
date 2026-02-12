@@ -12,7 +12,6 @@ html,body{height:100%}
 body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:var(--page-bg);display:flex;flex-direction:column}
 .topbar{z-index:1020}
 .main-shell{display:flex;flex-direction:column;flex:1;min-height:0}
-#views .btn.on{background:#0d6efd;color:#fff;border-color:#0d6efd}
 .filters{display:none;flex-direction:column;gap:.25rem}
 .filters.map-view .search-wrap,.filters.map-view #count{display:none!important}
 .filters [data-f="food"]{background:#f2f7ff;border-color:#a8c7ff;color:#1f4bb8}
@@ -47,12 +46,18 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background
 </head>
 <body>
 <div class="topbar sticky-top shadow-sm">
- <div class="bg-white border-bottom px-2 py-2">
-  <div class="btn-group w-100" id="views" role="tablist" aria-label="Map and list view switcher">
-   <button class="btn btn-outline-primary on" data-v="map" type="button" aria-pressed="true">Map</button>
-   <button class="btn btn-outline-primary" data-v="list" type="button" aria-pressed="false">List</button>
+ <nav class="navbar navbar-expand-lg bg-body-tertiary" data-bs-theme="dark">
+  <div class="container-fluid">
+      <div class="collapse navbar-collapse" id="navbarSupportedContent">
+    <ul class="navbar-nav me-auto mb-2 mb-lg-0" id="views" aria-label="Map and list view switcher">
+     <li class="nav-item"><a class="nav-link active" data-v="map" href="#" aria-current="page">Map View</a></li>
+     <li class="nav-item"><a class="nav-link" data-v="list" href="#">List View</a></li>
+    </ul>
+   </div>
   </div>
-  <div class="filters pt-2" id="filters">
+ </nav>
+ <div class="bg-white border-bottom px-2 py-2">
+  <div class="filters" id="filters">
    <div class="search-wrap d-flex flex-wrap gap-2 align-items-center w-100">
     <input id="search" class="form-control form-control-sm" type="search" placeholder="Search by name, town, or service" aria-label="Search by name, town, or service" autocomplete="off"/>
    </div>
@@ -220,10 +225,14 @@ const applyMapFilter=()=>{
 };
 
 const setActiveView=(view)=>{
- $$('#views button').forEach(btn=>{
-  const active=btn.dataset.v===view;
-  btn.classList.toggle('on',active);
-  btn.setAttribute('aria-pressed',active?'true':'false');
+ $$('#views [data-v]').forEach(link=>{
+  const active=link.dataset.v===view;
+  link.classList.toggle('active',active);
+  if(active){
+   link.setAttribute('aria-current','page');
+  }else{
+   link.removeAttribute('aria-current');
+  }
  });
 };
 
@@ -246,8 +255,9 @@ $('#list').addEventListener('click',e=>{
  setTimeout(()=>{map.invalidateSize(); map.setView([loc.lat,loc.lng],13); m.openPopup();},0);
 });
 
-$$('#views button').forEach(b=>b.onclick=()=>{
- const v=b.dataset.v; setActiveView(v);
+$$('#views [data-v]').forEach(link=>link.onclick=(e)=>{
+ e.preventDefault();
+ const v=link.dataset.v; setActiveView(v);
  const onMap=v==='map';
  $('#map').style.display=onMap?'block':'none'; $('#list').style.display=onMap?'none':'block';
  $('#filters').style.display='flex';
