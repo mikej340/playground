@@ -12,8 +12,6 @@ html,body{height:100%}
 body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:var(--page-bg);display:flex;flex-direction:column}
 .topbar{z-index:1020}
 .main-shell{display:flex;flex-direction:column;flex:1;min-height:0}
-#views .nav-link{color:#495057;font-weight:500;padding:.25rem .5rem}
-#views .nav-link.active{color:#0d6efd;text-decoration:underline;text-underline-offset:.2rem}
 .filters{display:none;flex-direction:column;gap:.25rem}
 .filters.map-view .search-wrap,.filters.map-view #count{display:none!important}
 .filters [data-f="food"]{background:#f2f7ff;border-color:#a8c7ff;color:#1f4bb8}
@@ -49,12 +47,14 @@ body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background
 <body>
 <div class="topbar sticky-top shadow-sm">
  <nav class="navbar navbar-expand bg-white border-bottom px-2 py-2">
-  <div class="container-fluid px-0">
-   <span class="navbar-brand mb-0 h1 fs-6">CHAT Map</span>
-   <ul class="navbar-nav flex-row gap-2 ms-2" id="views" aria-label="Map and list view switcher">
-    <li class="nav-item"><a class="nav-link active" data-v="map" href="#" aria-current="page">Map</a></li>
-    <li class="nav-item"><a class="nav-link" data-v="list" href="#">List</a></li>
-   </ul>
+  <div class="container-fluid px-0 justify-content-start">
+   <div class="d-flex align-items-center gap-2">
+    <span class="navbar-brand mb-0 h1 fs-6 me-1">CHAT Map</span>
+    <ul class="navbar-nav flex-row" id="views" aria-label="Map and list view switcher">
+     <li class="nav-item"><a class="nav-link px-2 active text-primary border-bottom border-2 border-primary" data-v="map" href="#" aria-current="page">Map</a></li>
+     <li class="nav-item"><a class="nav-link px-2 text-body-secondary" data-v="list" href="#">List</a></li>
+    </ul>
+   </div>
   </div>
  </nav>
  <div class="bg-white border-bottom px-2 py-2">
@@ -229,6 +229,11 @@ const setActiveView=(view)=>{
  $$('#views [data-v]').forEach(link=>{
   const active=link.dataset.v===view;
   link.classList.toggle('active',active);
+  link.classList.toggle('text-primary',active);
+  link.classList.toggle('border-bottom',active);
+  link.classList.toggle('border-2',active);
+  link.classList.toggle('border-primary',active);
+  link.classList.toggle('text-body-secondary',!active);
   if(active){
    link.setAttribute('aria-current','page');
   }else{
