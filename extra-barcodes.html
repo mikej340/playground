@@ -65,15 +65,14 @@
 
     .page { background: transparent; padding: 0; }
 
-    .category { margin-bottom: 12px; }
-
-    .category-title {
-      font-weight: 800;
-      font-size: 15px;
-      margin: 0 0 8px;
-      padding: 4px 0;
-      border-bottom: 0.35mm solid #111;
-      letter-spacing: 0.2px;
+    .category-label {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      color: #555;
+      margin-bottom: 1mm;
     }
 
     .grid {
@@ -84,6 +83,10 @@
       align-items: start;
       grid-auto-rows: auto;
     }
+
+    .print-page { margin-bottom: 6mm; }
+
+    .print-page:last-child { margin-bottom: 0; }
 
     .card {
       border: var(--border) solid #111;
@@ -97,6 +100,15 @@
       align-self: start;
       break-inside: avoid;
       page-break-inside: avoid;
+      background: #fff;
+      position: relative;
+    }
+
+    .card.cat-parity-1 { background: #f7f7f7; }
+
+    .card[data-cat-start="true"] {
+      border-top-width: 0.6mm;
+      border-top-color: #444;
     }
 
     .name {
@@ -178,11 +190,13 @@
       header, .status, #pastePanel { display: none !important; }
       main { padding: 0; max-width: none; margin: 0; }
       .page { padding: 0; }
-      .category { page-break-after: always; margin-bottom: 10mm; }
-      .category:last-child { page-break-after: auto; }
       /* Print: consistent row heights */
       .grid { align-items: stretch; }
       .card { align-self: stretch; }
+      .print-page { margin-bottom: 0; page-break-after: always; break-after: page; }
+      .print-page:last-child { page-break-after: auto; break-after: auto; }
+      .card.cat-parity-1 { background: #f2f2f2; }
+      .card[data-cat-start="true"] { border-top-color: #222; }
     }
   </style>
 </head>
@@ -381,6 +395,7 @@
     let CURRENT_RECORDS = [];
 
     function render(records) {
+      const CARDS_PER_PAGE = 9;
       const activeOnly = els.activeOnly.value === 'true';
       const selectedCategory = els.category.value;
       const sortMode = els.sortMode.value;
@@ -388,59 +403,94 @@
       let filtered = records.slice();
       if (activeOnly) filtered = filtered.filter(r => r.Active === true);
       if (selectedCategory !== '__ALL__') filtered = filtered.filter(r => r.Category === selectedCategory);
-
-      filtered.sort((a, b) => {
-        if (sortMode === 'barcode') return byBarcode(a.Barcode, b.Barcode);
-        return String(a['Product Name'] ?? '').localeCompare(String(b['Product Name'] ?? ''), undefined, { sensitivity: 'base' });
-      });
+      const withCategory = filtered.map(r => ({
+        ...r,
+        _category: r.Category || 'Uncategorised',
+      }));
 
       const groups = new Map();
-      for (const r of filtered) {
-        const cat = r.Category || 'Uncategorised';
-        if (!groups.has(cat)) groups.set(cat, []);
-        groups.get(cat).push(r);
+      for (const r of withCategory) {
+        if (!groups.has(r._category)) groups.set(r._category, []);
+        groups.get(r._category).push(r);
       }
 
-      const catsInOrder = Array.from(groups.keys()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+      const categoryGroups = Array.from(groups.entries()).map(([category, items]) => {
+        const sortedItems = items.slice().sort((a, b) => {
+          if (sortMode === 'barcode') return byBarcode(a.Barcode, b.Barcode);
+          return String(a['Product Name'] ?? '').localeCompare(String(b['Product Name'] ?? ''), undefined, { sensitivity: 'base' });
+        });
+        return { category, items: sortedItems };
+      });
 
-      const html = catsInOrder.map(cat => {
-        const cards = groups.get(cat).map(r => {
-          const name = escapeHtml(r['Product Name'] ?? '');
+      categoryGroups.sort((a, b) => {
+        if (b.items.length !== a.items.length) return b.items.length - a.items.length;
+        return a.category.localeCompare(b.category, undefined, { sensitivity: 'base' });
+      });
 
-          const driveId = (r['Photo Drive ID'] || '').trim();
-          const photoUrl = driveId
-            ? `https://drive.google.com/thumbnail?id=${driveId}&sz=w1200`
-            : (r.PhotoURL || '').trim();
+      const pages = [];
+      let currentPageGroups = [];
+      let currentPageCount = 0;
 
-          const barcodeUrl = (r.BarcodeURL || '').trim();
+      for (const group of categoryGroups) {
+        const size = group.items.length;
+        if (currentPageCount > 0 && currentPageCount + size > CARDS_PER_PAGE) {
+          pages.push(currentPageGroups);
+          currentPageGroups = [];
+          currentPageCount = 0;
+        }
+        currentPageGroups.push(group);
+        currentPageCount += size;
+      }
 
-          const photoHtml = photoUrl
-            ? `<img src="${escapeHtml(photoUrl)}" alt="${name}" />`
-            : '<div class="missing">No photo</div>';
+      if (currentPageGroups.length) pages.push(currentPageGroups);
 
-          const barcodeImg = barcodeUrl
-            ? `<img src="${escapeHtml(barcodeUrl)}" data-barcode-url="${escapeHtml(barcodeUrl)}" alt="Barcode" />`
-            : '<div class="missing">No barcode image</div>';
+      const categoriesSeen = new Set(categoryGroups.map(g => g.category));
 
-          return `
-            <div class="card">
-              <div class="name">${name}</div>
-              <div class="imgwrap">${photoHtml}</div>
-              <div class="barcode">${barcodeImg}</div>
-            </div>
-          `;
+      let catIndex = -1;
+      const pageHtml = pages.map(pageGroups => {
+        const pageCards = pageGroups.flatMap(group => {
+          catIndex += 1;
+          const parity = catIndex % 2;
+
+          return group.items.map((r, idx) => {
+            const name = escapeHtml(r['Product Name'] ?? '');
+            const category = group.category;
+
+            const driveId = (r['Photo Drive ID'] || '').trim();
+            const photoUrl = driveId
+          ? `https://drive.google.com/thumbnail?id=${driveId}&sz=w1200`
+          : (r.PhotoURL || '').trim();
+
+            const barcodeUrl = (r.BarcodeURL || '').trim();
+
+            const photoHtml = photoUrl
+          ? `<img src="${escapeHtml(photoUrl)}" alt="${name}" />`
+          : '<div class="missing">No photo</div>';
+
+            const barcodeImg = barcodeUrl
+          ? `<img src="${escapeHtml(barcodeUrl)}" data-barcode-url="${escapeHtml(barcodeUrl)}" alt="Barcode" />`
+          : '<div class="missing">No barcode image</div>';
+
+            const isCategoryStart = idx === 0;
+
+            return `
+              <div class="card cat-parity-${parity}" data-cat-start="${isCategoryStart}" data-category="${escapeHtml(category)}">
+                <div class="category-label">${escapeHtml(category)}</div>
+                <div class="name">${name}</div>
+                <div class="imgwrap">${photoHtml}</div>
+                <div class="barcode">${barcodeImg}</div>
+              </div>
+            `;
+          });
         }).join('');
 
-        return `
-          <section class="category">
-            <h2 class="category-title">${escapeHtml(cat)}</h2>
-            <div class="grid">${cards}</div>
-          </section>
-        `;
+        return `<section class="print-page"><div class="grid">${pageCards}</div></section>`;
       }).join('');
 
+      const html = pageHtml || '';
+
       els.page.innerHTML = html || '<div class="missing">No matching items.</div>';
-      setStatus(`${filtered.length} items • ${catsInOrder.length} categories`);
+      setStatus(`${withCategory.length} items • ${categoriesSeen.size} categories`);
 
       refreshVisibleBarcodes();
     }
