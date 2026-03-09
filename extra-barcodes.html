@@ -65,15 +65,14 @@
 
     .page { background: transparent; padding: 0; }
 
-    .category { margin-bottom: 12px; }
-
-    .category-title {
-      font-weight: 800;
-      font-size: 15px;
-      margin: 0 0 8px;
-      padding: 4px 0;
-      border-bottom: 0.35mm solid #111;
-      letter-spacing: 0.2px;
+    .category-label {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      color: #555;
+      margin-bottom: 1mm;
     }
 
     .grid {
@@ -97,6 +96,15 @@
       align-self: start;
       break-inside: avoid;
       page-break-inside: avoid;
+      background: #fff;
+      position: relative;
+    }
+
+    .card.cat-parity-1 { background: #f7f7f7; }
+
+    .card[data-cat-start="true"] {
+      border-top-width: 0.6mm;
+      border-top-color: #444;
     }
 
     .name {
@@ -178,11 +186,11 @@
       header, .status, #pastePanel { display: none !important; }
       main { padding: 0; max-width: none; margin: 0; }
       .page { padding: 0; }
-      .category { page-break-after: always; margin-bottom: 10mm; }
-      .category:last-child { page-break-after: auto; }
       /* Print: consistent row heights */
       .grid { align-items: stretch; }
       .card { align-self: stretch; }
+      .card.cat-parity-1 { background: #f2f2f2; }
+      .card[data-cat-start="true"] { border-top-color: #222; }
     }
   </style>
 </head>
@@ -388,59 +396,65 @@
       let filtered = records.slice();
       if (activeOnly) filtered = filtered.filter(r => r.Active === true);
       if (selectedCategory !== '__ALL__') filtered = filtered.filter(r => r.Category === selectedCategory);
+      const withCategory = filtered.map(r => ({
+        ...r,
+        _category: r.Category || 'Uncategorised',
+      }));
 
-      filtered.sort((a, b) => {
+      withCategory.sort((a, b) => {
+        const catCmp = a._category.localeCompare(b._category, undefined, { sensitivity: 'base' });
+        if (catCmp !== 0) return catCmp;
         if (sortMode === 'barcode') return byBarcode(a.Barcode, b.Barcode);
         return String(a['Product Name'] ?? '').localeCompare(String(b['Product Name'] ?? ''), undefined, { sensitivity: 'base' });
       });
 
-      const groups = new Map();
-      for (const r of filtered) {
-        const cat = r.Category || 'Uncategorised';
-        if (!groups.has(cat)) groups.set(cat, []);
-        groups.get(cat).push(r);
-      }
+      let prevCategory = '';
+      let catIndex = -1;
+      const categoriesSeen = new Set();
 
-      const catsInOrder = Array.from(groups.keys()).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+      const cards = withCategory.map((r, idx) => {
+        const name = escapeHtml(r['Product Name'] ?? '');
+        const category = r._category;
 
-      const html = catsInOrder.map(cat => {
-        const cards = groups.get(cat).map(r => {
-          const name = escapeHtml(r['Product Name'] ?? '');
+        if (category !== prevCategory) {
+          catIndex += 1;
+          prevCategory = category;
+        }
 
-          const driveId = (r['Photo Drive ID'] || '').trim();
-          const photoUrl = driveId
-            ? `https://drive.google.com/thumbnail?id=${driveId}&sz=w1200`
-            : (r.PhotoURL || '').trim();
+        categoriesSeen.add(category);
 
-          const barcodeUrl = (r.BarcodeURL || '').trim();
+        const driveId = (r['Photo Drive ID'] || '').trim();
+        const photoUrl = driveId
+          ? `https://drive.google.com/thumbnail?id=${driveId}&sz=w1200`
+          : (r.PhotoURL || '').trim();
 
-          const photoHtml = photoUrl
-            ? `<img src="${escapeHtml(photoUrl)}" alt="${name}" />`
-            : '<div class="missing">No photo</div>';
+        const barcodeUrl = (r.BarcodeURL || '').trim();
 
-          const barcodeImg = barcodeUrl
-            ? `<img src="${escapeHtml(barcodeUrl)}" data-barcode-url="${escapeHtml(barcodeUrl)}" alt="Barcode" />`
-            : '<div class="missing">No barcode image</div>';
+        const photoHtml = photoUrl
+          ? `<img src="${escapeHtml(photoUrl)}" alt="${name}" />`
+          : '<div class="missing">No photo</div>';
 
-          return `
-            <div class="card">
-              <div class="name">${name}</div>
-              <div class="imgwrap">${photoHtml}</div>
-              <div class="barcode">${barcodeImg}</div>
-            </div>
-          `;
-        }).join('');
+        const barcodeImg = barcodeUrl
+          ? `<img src="${escapeHtml(barcodeUrl)}" data-barcode-url="${escapeHtml(barcodeUrl)}" alt="Barcode" />`
+          : '<div class="missing">No barcode image</div>';
+
+        const isCategoryStart = idx === 0 || withCategory[idx - 1]._category !== category;
+        const parity = catIndex % 2;
 
         return `
-          <section class="category">
-            <h2 class="category-title">${escapeHtml(cat)}</h2>
-            <div class="grid">${cards}</div>
-          </section>
+          <div class="card cat-parity-${parity}" data-cat-start="${isCategoryStart}" data-category="${escapeHtml(category)}">
+            <div class="category-label">${escapeHtml(category)}</div>
+            <div class="name">${name}</div>
+            <div class="imgwrap">${photoHtml}</div>
+            <div class="barcode">${barcodeImg}</div>
+          </div>
         `;
       }).join('');
 
+      const html = cards ? `<div class="grid">${cards}</div>` : '';
+
       els.page.innerHTML = html || '<div class="missing">No matching items.</div>';
-      setStatus(`${filtered.length} items • ${catsInOrder.length} categories`);
+      setStatus(`${withCategory.length} items • ${categoriesSeen.size} categories`);
 
       refreshVisibleBarcodes();
     }
