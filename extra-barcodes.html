@@ -310,6 +310,12 @@
 
     // --- Barcode cache (high compatibility: localStorage + base64 data URLs) ---
     const BARCODE_CACHE_PREFIX = 'barcode_cache_v1|';
+    const BARCODE_MAX_CONCURRENT_FETCHES = 3;
+    const BARCODE_FETCH_SPACING_MS = 120;
+    const BARCODE_MAX_RETRIES = 3;
+    const barcodeFetchQueue = [];
+    const barcodeFetchInFlight = new Map();
+    let barcodeActiveFetches = 0;
 
     function cacheKeyFromUrl(url) { return BARCODE_CACHE_PREFIX + String(url || '').trim(); }
 
@@ -325,16 +331,69 @@
       try { localStorage.removeItem(cacheKeyFromUrl(url)); } catch { /* ignore */ }
     }
 
-    async function fetchAsDataUrl(url) {
-      const res = await fetch(url, { cache: 'force-cache' });
-      if (!res.ok) throw new Error('Fetch failed');
-      const blob = await res.blob();
-      return await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ''));
-        reader.onerror = () => reject(new Error('Read failed'));
-        reader.readAsDataURL(blob);
+    function wait(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function parseRetryAfterMs(res) {
+      const value = Number(res.headers.get('retry-after'));
+      if (Number.isFinite(value) && value > 0) return value * 1000;
+      return 0;
+    }
+
+    function enqueueBarcodeFetch(task) {
+      return new Promise((resolve, reject) => {
+        barcodeFetchQueue.push({ task, resolve, reject });
+        pumpBarcodeFetchQueue();
       });
+    }
+
+    function pumpBarcodeFetchQueue() {
+      if (barcodeActiveFetches >= BARCODE_MAX_CONCURRENT_FETCHES) return;
+      const next = barcodeFetchQueue.shift();
+      if (!next) return;
+
+      barcodeActiveFetches += 1;
+      Promise.resolve()
+        .then(next.task)
+        .then(next.resolve, next.reject)
+        .finally(() => {
+          barcodeActiveFetches -= 1;
+          setTimeout(pumpBarcodeFetchQueue, BARCODE_FETCH_SPACING_MS);
+          pumpBarcodeFetchQueue();
+        });
+    }
+
+    async function fetchAsDataUrl(url) {
+      let lastError = null;
+
+      for (let attempt = 1; attempt <= BARCODE_MAX_RETRIES; attempt += 1) {
+        const res = await fetch(url, { cache: 'force-cache' });
+
+        if (res.ok) {
+          const blob = await res.blob();
+          return await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result || ''));
+            reader.onerror = () => reject(new Error('Read failed'));
+            reader.readAsDataURL(blob);
+          });
+        }
+
+        if (res.status === 429 || res.status === 503) {
+          lastError = new Error(`Throttled (${res.status})`);
+          if (attempt < BARCODE_MAX_RETRIES) {
+            const retryAfterMs = parseRetryAfterMs(res);
+            const backoffMs = retryAfterMs || (250 * (2 ** (attempt - 1)));
+            await wait(backoffMs);
+            continue;
+          }
+        }
+
+        throw new Error(`Fetch failed (${res.status})`);
+      }
+
+      throw lastError || new Error('Fetch failed');
     }
 
     async function ensureBarcodeCached(url, mode) {
@@ -347,32 +406,53 @@
 
       if (mode === 'force') clearCachedBarcode(u);
 
-      try {
-        const dataUrl = await fetchAsDataUrl(u);
-        if (dataUrl && dataUrl.startsWith('data:')) {
-          setCachedBarcodeDataUrl(u, dataUrl);
-          return dataUrl;
-        }
-      } catch {
-        // If CORS blocks fetch(), fall back to direct URL
-      }
+      if (barcodeFetchInFlight.has(u)) return barcodeFetchInFlight.get(u);
 
-      return u;
+      const pending = enqueueBarcodeFetch(async () => {
+        try {
+          const dataUrl = await fetchAsDataUrl(u);
+          if (dataUrl && dataUrl.startsWith('data:')) {
+            setCachedBarcodeDataUrl(u, dataUrl);
+            return dataUrl;
+          }
+        } catch {
+          // If CORS blocks fetch() or remote throttles repeatedly, fall back to direct URL
+        }
+
+        return u;
+      }).finally(() => {
+        barcodeFetchInFlight.delete(u);
+      });
+
+      barcodeFetchInFlight.set(u, pending);
+      return pending;
     }
 
     function refreshVisibleBarcodes() {
       const mode = (els.cacheMode?.value || 'on');
-      const imgs = els.page.querySelectorAll('img[data-barcode-url]');
-      imgs.forEach(img => {
-        const url = img.getAttribute('data-barcode-url') || '';
-        if (!url) return;
+      const imgs = Array.from(els.page.querySelectorAll('img[data-barcode-url]'));
+      const byUrl = new Map();
 
+      imgs.forEach(img => {
+        const url = (img.getAttribute('data-barcode-url') || '').trim();
+        if (!url) return;
+        if (!byUrl.has(url)) byUrl.set(url, []);
+        byUrl.get(url).push(img);
+      });
+
+      byUrl.forEach((targets, url) => {
         if (mode === 'on') {
           const cached = getCachedBarcodeDataUrl(url);
-          if (cached) { img.src = cached; return; }
+          if (cached) {
+            targets.forEach(img => { img.src = cached; });
+            return;
+          }
         }
 
-        ensureBarcodeCached(url, mode).then(src => { if (src) img.src = src; });
+        ensureBarcodeCached(url, mode).then(src => {
+          if (!src) return;
+          targets.forEach(img => { img.src = src; });
+        });
       });
     }
 
