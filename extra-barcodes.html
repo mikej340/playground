@@ -310,31 +310,186 @@
 
     // --- Barcode cache (high compatibility: localStorage + base64 data URLs) ---
     const BARCODE_CACHE_PREFIX = 'barcode_cache_v1|';
+    const BARCODE_MAX_CONCURRENT_FETCHES = 3;
+    const BARCODE_FETCH_SPACING_MS = 120;
+    const BARCODE_MAX_RETRIES = 3;
+    const BARCODE_DEBUG = true;
+    const barcodeFetchQueue = [];
+    const barcodeFetchInFlight = new Map();
+    const barcodeMemoryCache = new Map();
+    const barcodeCorsBlockedOrigins = new Set();
+    const barcodeWarnedKeys = new Set();
+    let barcodeActiveFetches = 0;
+    let storageStatusLogged = false;
+
+    function debugLog(...args) {
+      if (!BARCODE_DEBUG) return;
+      console.log('[barcode-cache]', ...args);
+    }
+
+    function debugWarn(...args) {
+      if (!BARCODE_DEBUG) return;
+      console.warn('[barcode-cache]', ...args);
+    }
+
+    function debugWarnOnce(key, ...args) {
+      if (!BARCODE_DEBUG) return;
+      if (barcodeWarnedKeys.has(key)) return;
+      barcodeWarnedKeys.add(key);
+      console.warn('[barcode-cache]', ...args);
+    }
+
+    function getUrlOrigin(url) {
+      try {
+        return new URL(String(url || '').trim(), window.location.href).origin;
+      } catch {
+        return '';
+      }
+    }
 
     function cacheKeyFromUrl(url) { return BARCODE_CACHE_PREFIX + String(url || '').trim(); }
 
     function getCachedBarcodeDataUrl(url) {
-      try { return localStorage.getItem(cacheKeyFromUrl(url)) || ''; } catch { return ''; }
+      const u = String(url || '').trim();
+      if (barcodeMemoryCache.has(u)) {
+        debugLog('memory cache hit', u);
+        return barcodeMemoryCache.get(u) || '';
+      }
+
+      try {
+        const value = localStorage.getItem(cacheKeyFromUrl(u)) || '';
+        if (value) {
+          barcodeMemoryCache.set(u, value);
+          debugLog('localStorage cache hit', u);
+        } else {
+          debugLog('cache miss', u);
+        }
+        return value;
+      } catch (err) {
+        if (!storageStatusLogged) {
+          storageStatusLogged = true;
+          debugWarn('localStorage unavailable; using memory-only cache', err?.message || err);
+        }
+        return '';
+      }
     }
 
     function setCachedBarcodeDataUrl(url, dataUrl) {
-      try { localStorage.setItem(cacheKeyFromUrl(url), dataUrl); } catch { /* ignore */ }
+      const u = String(url || '').trim();
+      if (!u || !dataUrl) return;
+      barcodeMemoryCache.set(u, dataUrl);
+      try {
+        localStorage.setItem(cacheKeyFromUrl(u), dataUrl);
+        debugLog('cached in localStorage', u, `(len=${dataUrl.length})`);
+      } catch (err) {
+        if (!storageStatusLogged) {
+          storageStatusLogged = true;
+          debugWarn('localStorage write failed; using memory-only cache', err?.message || err);
+        } else {
+          debugWarn('localStorage write failed', u, err?.message || err);
+        }
+      }
     }
 
     function clearCachedBarcode(url) {
-      try { localStorage.removeItem(cacheKeyFromUrl(url)); } catch { /* ignore */ }
+      const u = String(url || '').trim();
+      barcodeMemoryCache.delete(u);
+      try {
+        localStorage.removeItem(cacheKeyFromUrl(u));
+        debugLog('cache cleared', u);
+      } catch (err) {
+        debugWarn('cache clear failed', u, err?.message || err);
+      }
+    }
+
+    function wait(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function parseRetryAfterMs(res) {
+      const header = res.headers.get('retry-after');
+      const value = Number(header);
+      if (Number.isFinite(value) && value > 0) return value * 1000;
+      const dateMs = header ? Date.parse(header) : Number.NaN;
+      if (Number.isFinite(dateMs)) {
+        const delta = dateMs - Date.now();
+        if (delta > 0) return delta;
+      }
+      return 0;
+    }
+
+    function enqueueBarcodeFetch(task) {
+      return new Promise((resolve, reject) => {
+        barcodeFetchQueue.push({ task, resolve, reject });
+        debugLog('fetch queued', `queue=${barcodeFetchQueue.length}`, `active=${barcodeActiveFetches}`);
+        pumpBarcodeFetchQueue();
+      });
+    }
+
+    function pumpBarcodeFetchQueue() {
+      if (barcodeActiveFetches >= BARCODE_MAX_CONCURRENT_FETCHES) return;
+      const next = barcodeFetchQueue.shift();
+      if (!next) return;
+
+      barcodeActiveFetches += 1;
+      debugLog('fetch start', `queue=${barcodeFetchQueue.length}`, `active=${barcodeActiveFetches}`);
+      Promise.resolve()
+        .then(next.task)
+        .then(next.resolve, next.reject)
+        .finally(() => {
+          barcodeActiveFetches -= 1;
+          debugLog('fetch end', `queue=${barcodeFetchQueue.length}`, `active=${barcodeActiveFetches}`);
+          setTimeout(pumpBarcodeFetchQueue, BARCODE_FETCH_SPACING_MS);
+          pumpBarcodeFetchQueue();
+        });
     }
 
     async function fetchAsDataUrl(url) {
-      const res = await fetch(url, { cache: 'force-cache' });
-      if (!res.ok) throw new Error('Fetch failed');
-      const blob = await res.blob();
-      return await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ''));
-        reader.onerror = () => reject(new Error('Read failed'));
-        reader.readAsDataURL(blob);
-      });
+      let lastError = null;
+
+      for (let attempt = 1; attempt <= BARCODE_MAX_RETRIES; attempt += 1) {
+        debugLog('fetch attempt', url, `attempt=${attempt}`);
+        let res;
+        try {
+          res = await fetch(url, { cache: 'force-cache' });
+        } catch (err) {
+          const origin = getUrlOrigin(url);
+          if (origin) {
+            barcodeCorsBlockedOrigins.add(origin);
+            debugWarnOnce(
+              `cors-blocked:${origin}`,
+              'fetch blocked (likely CORS/network). Marking origin as direct-image-only:',
+              origin
+            );
+          }
+          throw err;
+        }
+
+        if (res.ok) {
+          const blob = await res.blob();
+          return await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result || ''));
+            reader.onerror = () => reject(new Error('Read failed'));
+            reader.readAsDataURL(blob);
+          });
+        }
+
+        if (res.status === 429 || res.status === 503) {
+          lastError = new Error(`Throttled (${res.status})`);
+          if (attempt < BARCODE_MAX_RETRIES) {
+            const retryAfterMs = parseRetryAfterMs(res);
+            const backoffMs = retryAfterMs || (250 * (2 ** (attempt - 1)));
+            debugWarn('throttled response', url, `status=${res.status}`, `waitMs=${backoffMs}`);
+            await wait(backoffMs);
+            continue;
+          }
+        }
+
+        throw new Error(`Fetch failed (${res.status})`);
+      }
+
+      throw lastError || new Error('Fetch failed');
     }
 
     async function ensureBarcodeCached(url, mode) {
@@ -342,37 +497,67 @@
       if (!u) return '';
       if (mode === 'off') return u;
 
+      const origin = getUrlOrigin(u);
+      if (origin && barcodeCorsBlockedOrigins.has(origin)) {
+        debugLog('skipping data-url fetch for known blocked origin; using direct URL', origin);
+        return u;
+      }
+
       const existing = getCachedBarcodeDataUrl(u);
       if (mode !== 'force' && existing) return existing;
 
       if (mode === 'force') clearCachedBarcode(u);
 
-      try {
-        const dataUrl = await fetchAsDataUrl(u);
-        if (dataUrl && dataUrl.startsWith('data:')) {
-          setCachedBarcodeDataUrl(u, dataUrl);
-          return dataUrl;
-        }
-      } catch {
-        // If CORS blocks fetch(), fall back to direct URL
-      }
+      if (barcodeFetchInFlight.has(u)) return barcodeFetchInFlight.get(u);
+      debugLog('cache miss; scheduling fetch', u, `mode=${mode}`);
 
-      return u;
+      const pending = enqueueBarcodeFetch(async () => {
+        try {
+          const dataUrl = await fetchAsDataUrl(u);
+          if (dataUrl && dataUrl.startsWith('data:')) {
+            setCachedBarcodeDataUrl(u, dataUrl);
+            debugLog('fetch success', u);
+            return dataUrl;
+          }
+        } catch {
+          // If CORS blocks fetch() or remote throttles repeatedly, fall back to direct URL
+          debugWarnOnce(`fetch-fallback:${u}`, 'fetch failed, using direct URL fallback', u);
+        }
+
+        return u;
+      }).finally(() => {
+        barcodeFetchInFlight.delete(u);
+      });
+
+      barcodeFetchInFlight.set(u, pending);
+      return pending;
     }
 
     function refreshVisibleBarcodes() {
       const mode = (els.cacheMode?.value || 'on');
-      const imgs = els.page.querySelectorAll('img[data-barcode-url]');
-      imgs.forEach(img => {
-        const url = img.getAttribute('data-barcode-url') || '';
-        if (!url) return;
+      const imgs = Array.from(els.page.querySelectorAll('img[data-barcode-url]'));
+      const byUrl = new Map();
 
+      imgs.forEach(img => {
+        const url = (img.getAttribute('data-barcode-url') || '').trim();
+        if (!url) return;
+        if (!byUrl.has(url)) byUrl.set(url, []);
+        byUrl.get(url).push(img);
+      });
+
+      byUrl.forEach((targets, url) => {
         if (mode === 'on') {
           const cached = getCachedBarcodeDataUrl(url);
-          if (cached) { img.src = cached; return; }
+          if (cached) {
+            targets.forEach(img => { img.src = cached; });
+            return;
+          }
         }
 
-        ensureBarcodeCached(url, mode).then(src => { if (src) img.src = src; });
+        ensureBarcodeCached(url, mode).then(src => {
+          if (!src) return;
+          targets.forEach(img => { img.src = src; });
+        });
       });
     }
 
