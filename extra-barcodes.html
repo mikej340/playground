@@ -317,6 +317,8 @@
     const barcodeFetchQueue = [];
     const barcodeFetchInFlight = new Map();
     const barcodeMemoryCache = new Map();
+    const barcodeCorsBlockedOrigins = new Set();
+    const barcodeWarnedKeys = new Set();
     let barcodeActiveFetches = 0;
     let storageStatusLogged = false;
 
@@ -328,6 +330,21 @@
     function debugWarn(...args) {
       if (!BARCODE_DEBUG) return;
       console.warn('[barcode-cache]', ...args);
+    }
+
+    function debugWarnOnce(key, ...args) {
+      if (!BARCODE_DEBUG) return;
+      if (barcodeWarnedKeys.has(key)) return;
+      barcodeWarnedKeys.add(key);
+      console.warn('[barcode-cache]', ...args);
+    }
+
+    function getUrlOrigin(url) {
+      try {
+        return new URL(String(url || '').trim(), window.location.href).origin;
+      } catch {
+        return '';
+      }
     }
 
     function cacheKeyFromUrl(url) { return BARCODE_CACHE_PREFIX + String(url || '').trim(); }
@@ -432,7 +449,21 @@
 
       for (let attempt = 1; attempt <= BARCODE_MAX_RETRIES; attempt += 1) {
         debugLog('fetch attempt', url, `attempt=${attempt}`);
-        const res = await fetch(url, { cache: 'force-cache' });
+        let res;
+        try {
+          res = await fetch(url, { cache: 'force-cache' });
+        } catch (err) {
+          const origin = getUrlOrigin(url);
+          if (origin) {
+            barcodeCorsBlockedOrigins.add(origin);
+            debugWarnOnce(
+              `cors-blocked:${origin}`,
+              'fetch blocked (likely CORS/network). Marking origin as direct-image-only:',
+              origin
+            );
+          }
+          throw err;
+        }
 
         if (res.ok) {
           const blob = await res.blob();
@@ -466,6 +497,12 @@
       if (!u) return '';
       if (mode === 'off') return u;
 
+      const origin = getUrlOrigin(u);
+      if (origin && barcodeCorsBlockedOrigins.has(origin)) {
+        debugLog('skipping data-url fetch for known blocked origin; using direct URL', origin);
+        return u;
+      }
+
       const existing = getCachedBarcodeDataUrl(u);
       if (mode !== 'force' && existing) return existing;
 
@@ -484,7 +521,7 @@
           }
         } catch {
           // If CORS blocks fetch() or remote throttles repeatedly, fall back to direct URL
-          debugWarn('fetch failed, using direct URL fallback', u);
+          debugWarnOnce(`fetch-fallback:${u}`, 'fetch failed, using direct URL fallback', u);
         }
 
         return u;
