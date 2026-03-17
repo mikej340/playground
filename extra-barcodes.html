@@ -152,7 +152,7 @@
     .barcode img,
     .barcode canvas {
       width: 100%;
-      height: 12mm;
+      height: var(--barcode-height, 12mm);
       object-fit: contain;
       display: block;
     }
@@ -220,6 +220,11 @@
       </select>
     </label>
 
+    <label>
+      Barcode height:
+      <select id="barcodeHeight"></select>
+    </label>
+
     <div class="spacer"></div>
     <button onclick="window.print()">Print</button>
   </header>
@@ -256,9 +261,32 @@
       category: document.getElementById('category'),
       activeOnly: document.getElementById('activeOnly'),
       sortMode: document.getElementById('sortMode'),
+      barcodeHeight: document.getElementById('barcodeHeight'),
       status: document.getElementById('status'),
       page: document.getElementById('page'),
     };
+
+    const DEFAULT_BARCODE_HEIGHT_MM = 12;
+
+    function currentBarcodeHeightMm() {
+      const value = Number.parseInt(els.barcodeHeight.value, 10);
+      if (Number.isNaN(value)) return DEFAULT_BARCODE_HEIGHT_MM;
+      return Math.max(5, Math.min(30, value));
+    }
+
+    function applyBarcodeHeight(heightMm) {
+      document.documentElement.style.setProperty('--barcode-height', `${heightMm}mm`);
+    }
+
+    function buildBarcodeHeightDropdown() {
+      const options = [];
+      for (let mm = 5; mm <= 30; mm += 1) {
+        const selected = mm === DEFAULT_BARCODE_HEIGHT_MM ? ' selected' : '';
+        options.push(`<option value="${mm}"${selected}>${mm}mm</option>`);
+      }
+      els.barcodeHeight.innerHTML = options.join('');
+      applyBarcodeHeight(DEFAULT_BARCODE_HEIGHT_MM);
+    }
 
     function escapeHtml(s) {
       return String(s ?? '')
@@ -319,7 +347,7 @@
         bcid: bwipSymbology(symbologyText),
         text: original,
         scale: 2,
-        height: 12,
+        height: currentBarcodeHeightMm(),
         includetext: false,
         backgroundcolor: 'FFFFFF',
       };
@@ -503,6 +531,12 @@
     els.category.addEventListener('change', rerender);
     els.activeOnly.addEventListener('change', rerender);
     els.sortMode.addEventListener('change', rerender);
+    els.barcodeHeight.addEventListener('change', () => {
+      applyBarcodeHeight(currentBarcodeHeightMm());
+      rerender();
+    });
+
+    buildBarcodeHeightDropdown();
     // Default: show paste panel
     els.pastePanel.style.display = 'block';
   </script>
