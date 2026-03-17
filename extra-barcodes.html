@@ -13,6 +13,9 @@
       --card-pad: 2.5mm;
       --border: 0.25mm;
       --radius: 2.5mm;
+      --rows-per-page: 3;
+      --page-print-height: 277mm; /* A4 height (297mm) minus @page top+bottom margins (10mm each) */
+      --card-height: calc((var(--page-print-height) - (var(--gap) * (var(--rows-per-page) - 1))) / var(--rows-per-page));
       --font: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     }
 
@@ -78,10 +81,10 @@
     .grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-auto-rows: var(--card-height);
       gap: var(--gap);
       align-content: start;
       align-items: start;
-      grid-auto-rows: auto;
     }
 
     .card {
@@ -127,14 +130,14 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      max-height: 42mm;
-      min-height: 28mm;
+      flex: 1 1 auto;
+      min-height: 0;
       box-sizing: border-box;
     }
 
     .imgwrap img {
-      max-width: min(100%, 50mm);
-      max-height: min(100%, 32mm);
+      max-width: 100%;
+      max-height: 100%;
       width: auto;
       height: auto;
       object-fit: contain;
