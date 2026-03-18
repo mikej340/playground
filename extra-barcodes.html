@@ -15,7 +15,8 @@
       --radius: 2.5mm;
       --rows-per-page: 3;
       --page-print-height: 277mm; /* A4 height (297mm) minus @page top+bottom margins (10mm each) */
-      --card-height: calc((var(--page-print-height) - (var(--gap) * (var(--rows-per-page) - 1))) / var(--rows-per-page));
+      --card-height-tweak: 2mm; /* shrink cards slightly so 3 rows fit more reliably when printing */
+      --card-height: calc(((var(--page-print-height) - (var(--gap) * (var(--rows-per-page) - 1))) / var(--rows-per-page)) - var(--card-height-tweak));
       --font: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     }
 
