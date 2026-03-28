@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kick Circle (Audio Reactive)</title>
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/p5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/addons/p5.sound.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; background: #000; overflow: hidden; }
+    canvas { display: block; }
+    #ui {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.7);
+      padding: 10px;
+      color: white;
+      font-family: sans-serif;
+      font-size: 12px;
+      border-radius: 6px;
+      min-width: 280px;
+    }
+    label { display: block; margin-top: 6px; }
+    button, input[type="file"] { margin-top: 6px; }
+    .row { margin-top: 6px; }
+  </style>
+</head>
+<body>
+<div id="ui">
+  <div><strong>Kick Circle</strong></div>
+  <div class="row"><input id="audioFile" type="file" accept="audio/*"></div>
+  <div class="row"><button id="playBtn">Play / Pause</button></div>
+  <label>Min Size <input id="minSize" type="range" min="0" max="200" value="34"> <span id="minSizeVal"></span></label>
+  <label>Max Size <input id="maxSize" type="range" min="50" max="400" value="91"> <span id="maxSizeVal"></span></label>
+  <label>Attack (frames) <input id="attack" type="range" min="0" max="20" value="0"> <span id="attackVal"></span></label>
+  <label>Decay (frames) <input id="decay" type="range" min="0" max="30" value="27"> <span id="decayVal"></span></label>
+  <label>Threshold <input id="threshold" type="range" min="1" max="100" value="22"> <span id="thresholdVal"></span></label>
+  <label>Cooldown (frames) <input id="cooldown" type="range" min="1" max="60" value="18"> <span id="cooldownVal"></span></label>
+  <div class="row">Bass energy: <span id="energyVal"></span></div>
+  <div class="row">Kick trigger: <span id="triggerVal"></span></div>
+</div>
+<script>
+let soundFile;
+let fft;
+let envelopeFramesLeft = 0;
+let cooldownFramesLeft = 0;
+let fileReady = false;
+
+function setup() {
+  createCanvas(window.innerWidth, window.innerHeight);
+  frameRate(60);
+
+  fft = new p5.FFT(0.8, 1024);
+
+  document.getElementById('audioFile').addEventListener('change', handleFile);
+  document.getElementById('playBtn').addEventListener('click', togglePlay);
+}
+
+function handleFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  if (soundFile && soundFile.isPlaying()) {
+    soundFile.stop();
+  }
+
+  const url = URL.createObjectURL(file);
+  loadSound(url, loaded => {
+    soundFile = loaded;
+    fft.setInput(soundFile);
+    fileReady = true;
+  });
+}
+
+function togglePlay() {
+  userStartAudio();
+  if (!fileReady || !soundFile) return;
+
+  if (soundFile.isPlaying()) {
+    soundFile.pause();
+  } else {
+    soundFile.play();
+  }
+}
+
+function draw() {
+  background(0);
+
+  let minSize = Number(document.getElementById('minSize').value);
+  let maxSize = Number(document.getElementById('maxSize').value);
+  let attack = Number(document.getElementById('attack').value);
+  let decay = Number(document.getElementById('decay').value);
+  let threshold = Number(document.getElementById('threshold').value);
+  let cooldown = Number(document.getElementById('cooldown').value);
+
+  document.getElementById('minSizeVal').innerText = minSize;
+  document.getElementById('maxSizeVal').innerText = maxSize;
+  document.getElementById('attackVal').innerText = attack;
+  document.getElementById('decayVal').innerText = decay;
+  document.getElementById('thresholdVal').innerText = threshold;
+  document.getElementById('cooldownVal').innerText = cooldown;
+
+  let bassEnergy = 0;
+  let triggeredThisFrame = false;
+
+  if (fileReady && soundFile) {
+    bassEnergy = fft.getEnergy(20, 120);
+
+    if (cooldownFramesLeft > 0) {
+      cooldownFramesLeft--;
+    }
+
+    if (bassEnergy >= threshold && cooldownFramesLeft === 0) {
+      envelopeFramesLeft = attack + decay;
+      cooldownFramesLeft = cooldown;
+      triggeredThisFrame = true;
+    }
+  }
+
+  document.getElementById('energyVal').innerText = Math.round(bassEnergy);
+  document.getElementById('triggerVal').innerText = triggeredThisFrame ? 'YES' : 'no';
+
+  let size = minSize;
+
+  if (envelopeFramesLeft > 0) {
+    let elapsed = (attack + decay) - envelopeFramesLeft;
+
+    if (attack === 0 && decay > 0) {
+      let t = Math.min(elapsed / decay, 1);
+      size = lerp(maxSize, minSize, t);
+    } else if (attack > 0 && elapsed < attack) {
+      let t = elapsed / Math.max(attack, 1);
+      size = lerp(minSize, maxSize, t);
+    } else if (decay > 0) {
+      let decayElapsed = elapsed - attack;
+      let t = Math.min(decayElapsed / Math.max(decay, 1), 1);
+      size = lerp(maxSize, minSize, t);
+    } else {
+      size = minSize;
+    }
+
+    envelopeFramesLeft--;
+  }
+
+  noStroke();
+  fill(0, 0, 255);
+  translate(width / 2, height / 2);
+  ellipse(0, 0, size, size);
+}
+
+function windowResized() {
+  resizeCanvas(window.innerWidth, window.innerHeight);
+}
+</script>
+</body>
+</html>
