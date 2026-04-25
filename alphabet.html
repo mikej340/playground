@@ -322,6 +322,12 @@
   margin-top: 3px;
   line-height: 1.4;
 }
+.sprint-bests { display: flex; flex-direction: column; gap: 8px; }
+.sprint-empty { font-size: 13px; color: #a8a29e; }
+.sprint-row { display: flex; align-items: baseline; gap: 10px; }
+.sprint-rank { font-size: 11px; color: #a8a29e; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; width: 22px; }
+.sprint-score { font-size: 30px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+.sprint-detail { font-size: 13px; color: #78716c; }
 
   </style>
 </head>
@@ -450,6 +456,18 @@
         if (r <= 0) return i + 1;
       }
       return 26;
+    }
+
+    let sprintBests = (() => {
+      try { return JSON.parse(localStorage.getItem("alphabet-trainer-sprints") || "[]"); }
+      catch { return []; }
+    })();
+
+    function saveSprintBest(correct, wrong) {
+      sprintBests.push({ c: correct, w: wrong });
+      sprintBests.sort((a, b) => b.c - a.c || a.w - b.w);
+      sprintBests = sprintBests.slice(0, 5);
+      localStorage.setItem("alphabet-trainer-sprints", JSON.stringify(sprintBests));
     }
 
     function recordAttempt(kind, letter, correct, elapsedMs) {
@@ -589,6 +607,7 @@
           state.timeLeft = 0;
           state.sprintActive = false;
           state.sprintResult = state.sprintResult ?? "done";
+          saveSprintBest(state.stats.correct, state.stats.wrong);
           clearInterval(timerId);
           timerId = null;
         }
@@ -811,10 +830,25 @@
         return `<div class="stats-cell ${cls}"><div class="stats-letter">${letter}</div><div class="stats-num">${acc}%<br>${avgS}</div></div>`;
       }
 
+      const sprintHTML = sprintBests.length === 0
+        ? `<div class="sprint-empty">No completed sprints yet</div>`
+        : sprintBests.map((b, i) => {
+            const detail = b.w === 0 ? "all correct" : `${b.w} incorrect`;
+            return `<div class="sprint-row">
+              <span class="sprint-rank">#${i + 1}</span>
+              <span class="sprint-score">${b.c}</span>
+              <span class="sprint-detail">(${detail})</span>
+            </div>`;
+          }).join("");
+
       el.statsView.innerHTML = `
         <div class="stats-header">
           <div class="stats-title">Stats</div>
           <button class="stats-close" id="statsClose">✕</button>
+        </div>
+        <div class="stats-section">
+          <div class="stats-section-title">Sprint Bests</div>
+          <div class="sprint-bests">${sprintHTML}</div>
         </div>
         <div class="stats-section">
           <div class="stats-section-title">Number → Letter</div>
