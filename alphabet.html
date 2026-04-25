@@ -492,7 +492,10 @@
 
     // ============ Actions ============
     function setDirection(d) {
-      if (state.sprintActive || state.practiceActive) return;
+      const leavingWordPractice = state.mode === "PRACTICE" && state.direction === "WORD";
+      if (state.sprintActive) return;
+      if (state.practiceActive && !leavingWordPractice) return;
+      if (leavingWordPractice) stopPractice();
       state.direction = d;
       state.prompt = makePrompt(d);
       el.input.value = "";
@@ -620,7 +623,8 @@
     function submit(value) {
       const normalized = normalize(value, state.prompt.kind);
       if (!normalized) return;
-      if (state.mode === "PRACTICE" && !state.practiceActive) return;
+      const isPracticeWord = state.mode === "PRACTICE" && state.direction === "WORD";
+      if (state.mode === "PRACTICE" && !state.practiceActive && !isPracticeWord) return;
       const ok = normalized === state.prompt.answer;
       const elapsedMs = promptShownAt ? Date.now() - promptShownAt : 0;
       const letter = state.prompt.kind === "N2L" ? state.prompt.answer : state.prompt.question;
@@ -657,14 +661,15 @@
       const { mode, direction, prompt, stats, sprintActive, timeLeft, sprintResult, practiceActive, practiceTimeLeft } = state;
       const total = stats.correct + stats.wrong;
       const accuracy = total === 0 ? 0 : Math.round((stats.correct / total) * 100);
-      const inputDisabled = (mode === "SPRINT" && !sprintActive) || (mode === "PRACTICE" && !practiceActive);
+      const isPracticeWord = mode === "PRACTICE" && direction === "WORD";
+      const inputDisabled = (mode === "SPRINT" && !sprintActive) || (mode === "PRACTICE" && !practiceActive && !isPracticeWord);
       const showResult = mode === "SPRINT" && !sprintActive && sprintResult && total > 0;
-      const showStartScreen = (mode === "SPRINT" && !sprintActive && !sprintResult) || (mode === "PRACTICE" && !practiceActive);
+      const showStartScreen = (mode === "SPRINT" && !sprintActive && !sprintResult) || (mode === "PRACTICE" && !practiceActive && !isPracticeWord);
 
       // Pills
       Array.from(el.pills.children).forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.key === direction);
-        btn.disabled = sprintActive || practiceActive;
+        btn.disabled = sprintActive || (practiceActive && !isPracticeWord);
       });
 
       // Mode toggle
@@ -725,7 +730,8 @@
     el.input.addEventListener("input", (e) => {
       const v = e.target.value;
       if (state.mode === "SPRINT" && !state.sprintActive) return;
-      if (state.mode === "PRACTICE" && !state.practiceActive) return;
+      const _isPracticeWord = state.mode === "PRACTICE" && state.direction === "WORD";
+      if (state.mode === "PRACTICE" && !state.practiceActive && !_isPracticeWord) return;
       if (state.prompt.kind === "N2L") {
         const c = v.trim();
         if (c.length >= 1 && /^[A-Za-z]$/.test(c)) submit(c);
