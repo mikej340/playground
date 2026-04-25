@@ -137,6 +137,15 @@
   color: #78716c;
   margin-top: 12px;
 }
+.result-best {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: #57534e;
+  margin-top: 8px;
+}
+.result-score.ready {
+  font-size: 48px;
+}
 
 /* Buttons */
 .btn-primary {
@@ -361,10 +370,12 @@
 
     <!-- Stage -->
     <div class="stage" id="stage">
-      <!-- Result screen -->
+      <!-- Idle / Result screen -->
       <div class="result hidden" id="result">
+        <div class="result-meta" id="resultMode">Practice · N→L</div>
         <div class="result-score" id="resultScore">0</div>
         <div class="result-meta" id="resultMeta">0% · streak 0</div>
+        <div class="result-best" id="resultBest">Sprint best: —</div>
         <button class="btn-primary mt-lg" id="againBtn">Again</button>
       </div>
 
@@ -547,8 +558,10 @@
       app: document.getElementById("app"),
       stage: document.getElementById("stage"),
       result: document.getElementById("result"),
+      resultMode: document.getElementById("resultMode"),
       resultScore: document.getElementById("resultScore"),
       resultMeta: document.getElementById("resultMeta"),
+      resultBest: document.getElementById("resultBest"),
       againBtn: document.getElementById("againBtn"),
       active: document.getElementById("active"),
       prompt: document.getElementById("prompt"),
@@ -768,8 +781,9 @@
       const total = stats.correct + stats.wrong;
       const accuracy = total === 0 ? 0 : Math.round((stats.correct / total) * 100);
       const inputDisabled = (mode === "SPRINT" && !sprintActive) || (mode === "PRACTICE" && !practiceActive);
-      const showResult = mode === "SPRINT" && !sprintActive && sprintResult && total > 0;
-      const showStartScreen = (mode === "SPRINT" && !sprintActive && !sprintResult) || (mode === "PRACTICE" && !practiceActive);
+      const activeSession = (mode === "SPRINT" && sprintActive) || (mode === "PRACTICE" && practiceActive);
+      const idleScreen = !activeSession;
+      const showSprintSummary = mode === "SPRINT" && !sprintActive && sprintResult && total > 0;
 
       // Pills
       Array.from(el.pills.children).forEach((btn) => {
@@ -803,16 +817,36 @@
       }
 
       // Stage panels
-      el.result.classList.toggle("hidden", !showResult);
-      el.active.classList.toggle("hidden", showResult || showStartScreen);
+      el.result.classList.toggle("hidden", !idleScreen);
+      el.active.classList.toggle("hidden", idleScreen);
 
-      if (showResult) {
+      if (idleScreen) {
+        const modeLabel = MODES[mode];
+        const directionLabel = DIRECTIONS[direction];
+        const best = sprintBests[direction];
+        const bestText = best ? `${best.c} (${best.w} wrong)` : "—";
+
+        el.resultMode.textContent = `${modeLabel} · ${directionLabel}`;
+        el.resultBest.textContent = `Sprint best: ${bestText}`;
+      }
+
+      if (showSprintSummary) {
+        el.resultScore.classList.remove("ready");
         el.resultScore.textContent = stats.correct;
         el.resultMeta.textContent = `${accuracy}% · streak ${stats.best}`;
+        el.againBtn.textContent = "Again";
+      } else if (idleScreen) {
+        el.resultScore.classList.add("ready");
+        el.resultScore.textContent = "Ready";
+        el.resultMeta.textContent = mode === "SPRINT" ? "60s sprint" : "Timed prompts";
+        el.againBtn.textContent = "Start";
+      }
+      if (idleScreen) {
+        el.againBtn.onclick = () => { if (state.mode === "SPRINT") startSprint(); else startPractice(); };
       }
 
       // Active prompt
-      if (!showResult && !showStartScreen) {
+      if (activeSession) {
         el.prompt.textContent = prompt.question;
         el.prompt.classList.toggle("word", prompt.kind === "WORD");
         el.input.disabled = inputDisabled;
@@ -833,19 +867,13 @@
         ).join("");
       }
 
-      // Action button — Start when idle, Stop during sprint or active practice
-      const showAction = showStartScreen || (mode === "SPRINT" && sprintActive) || (mode === "PRACTICE" && practiceActive);
+      // Action button — Stop during sprint or active practice
+      const showAction = activeSession;
       el.actionRow.classList.toggle("hidden", !showAction);
       if (showAction) {
-        if (showStartScreen) {
-          el.actionBtn.textContent = "Start";
-          el.actionBtn.className = "btn-primary";
-          el.actionBtn.onclick = () => { if (state.mode === "SPRINT") startSprint(); else startPractice(); };
-        } else {
-          el.actionBtn.textContent = "Stop";
-          el.actionBtn.className = "btn-secondary";
-          el.actionBtn.onclick = mode === "SPRINT" ? endSprint : () => { stopPractice(); render(); };
-        }
+        el.actionBtn.textContent = "Stop";
+        el.actionBtn.className = "btn-secondary";
+        el.actionBtn.onclick = mode === "SPRINT" ? endSprint : () => { stopPractice(); render(); };
       }
     }
 
@@ -934,8 +962,6 @@
         submit(el.input.value);
       }
     });
-
-    el.againBtn.addEventListener("click", startSprint);
 
     el.timeoutRow.addEventListener("click", (e) => {
       const btn = e.target.closest("[data-t]");
