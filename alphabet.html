@@ -260,6 +260,29 @@
 
 .hidden { display: none !important; }
 
+/* Timeout toggle */
+.timeout-row {
+  display: flex;
+  gap: 6px;
+  padding-bottom: 6px;
+}
+.timeout-btn {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 0;
+  border-radius: 9999px;
+  border: 1px solid #d6d3d1;
+  background: white;
+  color: #57534e;
+  transition: all 0.15s;
+}
+.timeout-btn.active {
+  background: #1c1917;
+  color: #fafaf9;
+  border-color: #1c1917;
+}
+
 /* Stats view */
 .stats-btn {
   font-size: 12px;
@@ -366,6 +389,13 @@
 
 <!-- Bottom controls -->
 <div class="controls">
+  <!-- Timeout toggle (practice mode, non-word) -->
+  <div class="timeout-row hidden" id="timeoutRow">
+    <button class="timeout-btn" data-t="5">5s</button>
+    <button class="timeout-btn" data-t="10">10s</button>
+    <button class="timeout-btn" data-t="20">20s</button>
+  </div>
+
   <!-- Action button (Start / Stop) — above pills -->
   <div class="action-row hidden" id="actionRow">
     <button class="btn-primary" id="actionBtn">Start</button>
@@ -502,6 +532,7 @@
       timeLeft: 60,
       sprintResult: null,
       practiceActive: false,
+      practiceTimeout: 5,
       practiceTimeLeft: 5,
       statsOpen: false,
     };
@@ -527,6 +558,7 @@
       pills: document.getElementById("pills"),
       modeToggle: document.getElementById("modeToggle"),
       statusReadout: document.getElementById("statusReadout"),
+      timeoutRow: document.getElementById("timeoutRow"),
       actionRow: document.getElementById("actionRow"),
       actionBtn: document.getElementById("actionBtn"),
       statsBtn: document.getElementById("statsBtn"),
@@ -633,7 +665,7 @@
       clearInterval(practiceTimerId);
       practiceTimerId = null;
       if (state.prompt.kind === "WORD") return;
-      state.practiceTimeLeft = 5;
+      state.practiceTimeLeft = state.practiceTimeout;
       promptShownAt = Date.now();
       render();
       practiceTimerId = setInterval(() => {
@@ -789,6 +821,15 @@
         if (el.input.maxLength !== newMaxLength) el.input.maxLength = newMaxLength;
       }
 
+      // Timeout toggle — practice idle only, not word mode
+      const showTimeout = mode === "PRACTICE" && !practiceActive && !isPracticeWord;
+      el.timeoutRow.classList.toggle("hidden", !showTimeout);
+      if (showTimeout) {
+        Array.from(el.timeoutRow.children).forEach(btn => {
+          btn.classList.toggle("active", Number(btn.dataset.t) === state.practiceTimeout);
+        });
+      }
+
       // Action button — Start when idle, Stop during sprint
       const showAction = showStartScreen || (mode === "SPRINT" && sprintActive);
       el.actionRow.classList.toggle("hidden", !showAction);
@@ -890,6 +931,13 @@
     });
 
     el.againBtn.addEventListener("click", startSprint);
+
+    el.timeoutRow.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-t]");
+      if (!btn) return;
+      state.practiceTimeout = Number(btn.dataset.t);
+      render();
+    });
 
     el.statsBtn.addEventListener("click", () => {
       state.statsOpen = true;
