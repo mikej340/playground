@@ -239,7 +239,7 @@
 }
 .counter .slash { color: #a8a29e; }
 
-.action-row { padding-top: 8px; }
+.action-row { padding-bottom: 4px; }
 
 /* Animations */
 .pulse-ok { animation: po 0.35s ease-out; }
@@ -260,10 +260,82 @@
 
 .hidden { display: none !important; }
 
+/* Stats view */
+.stats-btn {
+  font-size: 12px;
+  font-weight: 500;
+  color: #78716c;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+.stats-btn:active { color: #1c1917; }
+.stats-view {
+  position: fixed;
+  inset: 0;
+  background: #f5f5f4;
+  overflow-y: auto;
+  z-index: 10;
+  padding: 24px 16px 40px;
+}
+.stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.stats-title { font-size: 20px; font-weight: 700; }
+.stats-close {
+  font-size: 20px;
+  line-height: 1;
+  color: #57534e;
+  padding: 4px 8px;
+}
+.stats-section { margin-bottom: 28px; }
+.stats-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #78716c;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 5px;
+}
+.stats-cell {
+  border-radius: 8px;
+  padding: 8px 2px 6px;
+  text-align: center;
+  background: #e7e5e4;
+}
+.stats-cell.none { opacity: 0.35; }
+.stats-cell.good { background: #bbf7d0; }
+.stats-cell.ok   { background: #fef08a; }
+.stats-cell.bad  { background: #fecaca; }
+.stats-letter { font-size: 17px; font-weight: 700; line-height: 1; }
+.stats-num {
+  font-size: 9px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #44403c;
+  margin-top: 3px;
+  line-height: 1.4;
+}
+.sprint-bests { display: flex; flex-direction: column; gap: 8px; }
+.sprint-empty { font-size: 13px; color: #a8a29e; }
+.sprint-row { display: flex; align-items: baseline; gap: 10px; }
+.sprint-rank { font-size: 11px; color: #a8a29e; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; width: 22px; }
+.sprint-score { font-size: 30px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+.sprint-detail { font-size: 13px; color: #78716c; }
+
   </style>
 </head>
 <body>
   <div class="app" id="app">
+    <!-- Stats view (full-screen overlay) -->
+    <div class="stats-view hidden" id="statsView"></div>
+
     <!-- Stage -->
     <div class="stage" id="stage">
       <!-- Result screen -->
@@ -272,11 +344,6 @@
         <div class="result-meta" id="resultMeta">0% · streak 0</div>
         <button class="btn-primary mt-lg" id="againBtn">Again</button>
       </div>
-
-  <!-- Start screen -->
-  <div class="result hidden" id="startScreen">
-    <button class="btn-primary lg" id="startBtn">Start</button>
-  </div>
 
   <!-- Active prompt -->
   <div class="stage-inner" id="active">
@@ -299,18 +366,18 @@
 
 <!-- Bottom controls -->
 <div class="controls">
+  <!-- Action button (Start / Stop) — above pills -->
+  <div class="action-row hidden" id="actionRow">
+    <button class="btn-primary" id="actionBtn">Start</button>
+  </div>
+
   <!-- Direction pills -->
   <div class="pills" id="pills"></div>
 
-  <!-- Mode + counter/timer -->
+  <!-- Mode toggle -->
   <div class="toolbar">
     <div class="mode-toggle" id="modeToggle"></div>
-    <div id="statusReadout"></div>
-  </div>
-
-  <!-- Action button -->
-  <div class="action-row hidden" id="actionRow">
-    <button class="btn-secondary" id="actionBtn">Reset</button>
+    <button class="stats-btn" id="statsBtn">Stats</button>
   </div>
 </div>
 
@@ -391,6 +458,18 @@
       return 26;
     }
 
+    let sprintBests = (() => {
+      try { return JSON.parse(localStorage.getItem("alphabet-trainer-sprints") || "[]"); }
+      catch { return []; }
+    })();
+
+    function saveSprintBest(correct, wrong) {
+      sprintBests.push({ c: correct, w: wrong });
+      sprintBests.sort((a, b) => b.c - a.c || a.w - b.w);
+      sprintBests = sprintBests.slice(0, 5);
+      localStorage.setItem("alphabet-trainer-sprints", JSON.stringify(sprintBests));
+    }
+
     function recordAttempt(kind, letter, correct, elapsedMs) {
       if (kind === "WORD") return;
       const s = letterStats[kind][letter] || { a: 0, w: 0, t: 0 };
@@ -431,6 +510,7 @@
       sprintResult: null,
       practiceActive: false,
       practiceTimeLeft: 5,
+      statsOpen: false,
     };
 
     let timerId = null;
@@ -446,8 +526,6 @@
       resultScore: document.getElementById("resultScore"),
       resultMeta: document.getElementById("resultMeta"),
       againBtn: document.getElementById("againBtn"),
-      startScreen: document.getElementById("startScreen"),
-      startBtn: document.getElementById("startBtn"),
       active: document.getElementById("active"),
       prompt: document.getElementById("prompt"),
       input: document.getElementById("input"),
@@ -458,6 +536,8 @@
       statusReadout: document.getElementById("statusReadout"),
       actionRow: document.getElementById("actionRow"),
       actionBtn: document.getElementById("actionBtn"),
+      statsBtn: document.getElementById("statsBtn"),
+      statsView: document.getElementById("statsView"),
     };
 
     // ============ Build static UI ============
@@ -492,7 +572,10 @@
 
     // ============ Actions ============
     function setDirection(d) {
-      if (state.sprintActive || state.practiceActive) return;
+      const leavingWordPractice = state.mode === "PRACTICE" && state.direction === "WORD";
+      if (state.sprintActive) return;
+      if (state.practiceActive && !leavingWordPractice) return;
+      if (leavingWordPractice) stopPractice();
       state.direction = d;
       state.prompt = makePrompt(d);
       el.input.value = "";
@@ -524,6 +607,7 @@
           state.timeLeft = 0;
           state.sprintActive = false;
           state.sprintResult = state.sprintResult ?? "done";
+          saveSprintBest(state.stats.correct, state.stats.wrong);
           clearInterval(timerId);
           timerId = null;
         }
@@ -620,7 +704,8 @@
     function submit(value) {
       const normalized = normalize(value, state.prompt.kind);
       if (!normalized) return;
-      if (state.mode === "PRACTICE" && !state.practiceActive) return;
+      const isPracticeWord = state.mode === "PRACTICE" && state.direction === "WORD";
+      if (state.mode === "PRACTICE" && !state.practiceActive && !isPracticeWord) return;
       const ok = normalized === state.prompt.answer;
       const elapsedMs = promptShownAt ? Date.now() - promptShownAt : 0;
       const letter = state.prompt.kind === "N2L" ? state.prompt.answer : state.prompt.question;
@@ -657,14 +742,15 @@
       const { mode, direction, prompt, stats, sprintActive, timeLeft, sprintResult, practiceActive, practiceTimeLeft } = state;
       const total = stats.correct + stats.wrong;
       const accuracy = total === 0 ? 0 : Math.round((stats.correct / total) * 100);
-      const inputDisabled = (mode === "SPRINT" && !sprintActive) || (mode === "PRACTICE" && !practiceActive);
+      const isPracticeWord = mode === "PRACTICE" && direction === "WORD";
+      const inputDisabled = (mode === "SPRINT" && !sprintActive) || (mode === "PRACTICE" && !practiceActive && !isPracticeWord);
       const showResult = mode === "SPRINT" && !sprintActive && sprintResult && total > 0;
-      const showStartScreen = (mode === "SPRINT" && !sprintActive && !sprintResult) || (mode === "PRACTICE" && !practiceActive);
+      const showStartScreen = (mode === "SPRINT" && !sprintActive && !sprintResult) || (mode === "PRACTICE" && !practiceActive && !isPracticeWord);
 
       // Pills
       Array.from(el.pills.children).forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.key === direction);
-        btn.disabled = sprintActive || practiceActive;
+        btn.disabled = sprintActive || (practiceActive && !isPracticeWord);
       });
 
       // Mode toggle
@@ -672,18 +758,17 @@
         btn.classList.toggle("active", btn.dataset.key === mode);
       });
 
-      // Status readout — sprint timer only; practice countdown lives in the stage
-      if (mode === "SPRINT") {
+      // Stats overlay
+      el.statsView.classList.toggle("hidden", !state.statsOpen);
+
+      // Countdown in stage (below input, stays above keyboard)
+      if (mode === "SPRINT" && sprintActive) {
         const mins = Math.floor(timeLeft / 60);
         const secs = String(timeLeft % 60).padStart(2, "0");
-        const warn = timeLeft <= 10 && sprintActive;
-        el.statusReadout.innerHTML = `<div class="timer ${warn ? "warn" : ""}">${mins}:${secs}</div>`;
-      } else {
-        el.statusReadout.innerHTML = "";
-      }
-
-      // Practice countdown (below input, stays above keyboard)
-      if (mode === "PRACTICE" && practiceActive) {
+        const warn = timeLeft <= 10;
+        el.promptTimer.textContent = `${mins}:${secs}`;
+        el.promptTimer.className = `prompt-timer${warn ? " warn" : ""}`;
+      } else if (mode === "PRACTICE" && practiceActive) {
         el.promptTimer.textContent = `${practiceTimeLeft}s`;
         el.promptTimer.className = `prompt-timer${practiceTimeLeft <= 2 ? " warn" : ""}`;
       } else {
@@ -693,7 +778,6 @@
 
       // Stage panels
       el.result.classList.toggle("hidden", !showResult);
-      el.startScreen.classList.toggle("hidden", !showStartScreen);
       el.active.classList.toggle("hidden", showResult || showStartScreen);
 
       if (showResult) {
@@ -712,20 +796,81 @@
         if (el.input.maxLength !== newMaxLength) el.input.maxLength = newMaxLength;
       }
 
-      // Action button — sprint stop only; practice auto-stops on timeout
-      const showAction = mode === "SPRINT" && sprintActive;
+      // Action button — Start when idle, Stop during sprint
+      const showAction = showStartScreen || (mode === "SPRINT" && sprintActive);
       el.actionRow.classList.toggle("hidden", !showAction);
       if (showAction) {
-        el.actionBtn.textContent = "Stop";
-        el.actionBtn.onclick = endSprint;
+        if (showStartScreen) {
+          el.actionBtn.textContent = "Start";
+          el.actionBtn.className = "btn-primary";
+          el.actionBtn.onclick = () => { if (state.mode === "SPRINT") startSprint(); else startPractice(); };
+        } else {
+          el.actionBtn.textContent = "Stop";
+          el.actionBtn.className = "btn-secondary";
+          el.actionBtn.onclick = endSprint;
+        }
       }
+    }
+
+    // ============ Stats ============
+    function renderStats() {
+      const LETTERS = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i));
+
+      function cell(kind, letter) {
+        const s = letterStats[kind][letter] || { a: 0, w: 0, t: 0 };
+        if (s.a === 0) {
+          return `<div class="stats-cell none"><div class="stats-letter">${letter}</div><div class="stats-num">—</div></div>`;
+        }
+        const correct = s.a - s.w;
+        const acc = Math.round((correct / s.a) * 100);
+        const avgMs = correct > 0 ? s.t / correct : null;
+        const avgS = avgMs != null ? (avgMs / 1000).toFixed(1) + "s" : "—";
+        const cls = acc >= 85 && (avgMs == null || avgMs <= 2500) ? "good"
+                  : acc >= 70 ? "ok" : "bad";
+        return `<div class="stats-cell ${cls}"><div class="stats-letter">${letter}</div><div class="stats-num">${acc}%<br>${avgS}</div></div>`;
+      }
+
+      const sprintHTML = sprintBests.length === 0
+        ? `<div class="sprint-empty">No completed sprints yet</div>`
+        : sprintBests.map((b, i) => {
+            const detail = b.w === 0 ? "all correct" : `${b.w} incorrect`;
+            return `<div class="sprint-row">
+              <span class="sprint-rank">#${i + 1}</span>
+              <span class="sprint-score">${b.c}</span>
+              <span class="sprint-detail">(${detail})</span>
+            </div>`;
+          }).join("");
+
+      el.statsView.innerHTML = `
+        <div class="stats-header">
+          <div class="stats-title">Stats</div>
+          <button class="stats-close" id="statsClose">✕</button>
+        </div>
+        <div class="stats-section">
+          <div class="stats-section-title">Sprint Bests</div>
+          <div class="sprint-bests">${sprintHTML}</div>
+        </div>
+        <div class="stats-section">
+          <div class="stats-section-title">Number → Letter</div>
+          <div class="stats-grid">${LETTERS.map(l => cell("N2L", l)).join("")}</div>
+        </div>
+        <div class="stats-section">
+          <div class="stats-section-title">Letter → Number</div>
+          <div class="stats-grid">${LETTERS.map(l => cell("L2N", l)).join("")}</div>
+        </div>
+      `;
+      document.getElementById("statsClose").addEventListener("click", () => {
+        state.statsOpen = false;
+        render();
+      });
     }
 
     // ============ Events ============
     el.input.addEventListener("input", (e) => {
       const v = e.target.value;
       if (state.mode === "SPRINT" && !state.sprintActive) return;
-      if (state.mode === "PRACTICE" && !state.practiceActive) return;
+      const _isPracticeWord = state.mode === "PRACTICE" && state.direction === "WORD";
+      if (state.mode === "PRACTICE" && !state.practiceActive && !_isPracticeWord) return;
       if (state.prompt.kind === "N2L") {
         const c = v.trim();
         if (c.length >= 1 && /^[A-Za-z]$/.test(c)) submit(c);
@@ -742,11 +887,13 @@
       }
     });
 
-    el.startBtn.addEventListener("click", () => {
-      if (state.mode === "SPRINT") startSprint();
-      else startPractice();
-    });
     el.againBtn.addEventListener("click", startSprint);
+
+    el.statsBtn.addEventListener("click", () => {
+      state.statsOpen = true;
+      renderStats();
+      render();
+    });
 
     // ============ Keyboard / scroll fix backstop ============
     // interactive-widget=resizes-content in the meta tag does the heavy lifting.
