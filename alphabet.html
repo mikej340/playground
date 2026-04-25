@@ -390,11 +390,7 @@
 <!-- Bottom controls -->
 <div class="controls">
   <!-- Timeout toggle (practice mode, non-word) -->
-  <div class="timeout-row hidden" id="timeoutRow">
-    <button class="timeout-btn" data-t="5">5s</button>
-    <button class="timeout-btn" data-t="10">10s</button>
-    <button class="timeout-btn" data-t="20">20s</button>
-  </div>
+  <div class="timeout-row hidden" id="timeoutRow"></div>
 
   <!-- Action button (Start / Stop) — above pills -->
   <div class="action-row hidden" id="actionRow">
@@ -536,6 +532,7 @@
       sprintResult: null,
       practiceActive: false,
       practiceTimeout: 5,
+      wordTimeout: 30,
       practiceTimeLeft: 5,
       statsOpen: false,
     };
@@ -600,10 +597,7 @@
 
     // ============ Actions ============
     function setDirection(d) {
-      const leavingWordPractice = state.mode === "PRACTICE" && state.direction === "WORD";
-      if (state.sprintActive) return;
-      if (state.practiceActive && !leavingWordPractice) return;
-      if (leavingWordPractice) stopPractice();
+      if (state.sprintActive || state.practiceActive) return;
       state.direction = d;
       state.prompt = makePrompt(d);
       el.input.value = "";
@@ -667,8 +661,7 @@
     function startPromptTimer() {
       clearInterval(practiceTimerId);
       practiceTimerId = null;
-      if (state.prompt.kind === "WORD") return;
-      state.practiceTimeLeft = state.practiceTimeout;
+      state.practiceTimeLeft = state.direction === "WORD" ? state.wordTimeout : state.practiceTimeout;
       promptShownAt = Date.now();
       render();
       practiceTimerId = setInterval(() => {
@@ -732,8 +725,7 @@
     function submit(value) {
       const normalized = normalize(value, state.prompt.kind);
       if (!normalized) return;
-      const isPracticeWord = state.mode === "PRACTICE" && state.direction === "WORD";
-      if (state.mode === "PRACTICE" && !state.practiceActive && !isPracticeWord) return;
+      if (state.mode === "PRACTICE" && !state.practiceActive) return;
       const ok = normalized === state.prompt.answer;
       const elapsedMs = promptShownAt ? Date.now() - promptShownAt : 0;
       const letter = state.prompt.kind === "N2L" ? state.prompt.answer : state.prompt.question;
@@ -770,15 +762,14 @@
       const { mode, direction, prompt, stats, sprintActive, timeLeft, sprintResult, practiceActive, practiceTimeLeft } = state;
       const total = stats.correct + stats.wrong;
       const accuracy = total === 0 ? 0 : Math.round((stats.correct / total) * 100);
-      const isPracticeWord = mode === "PRACTICE" && direction === "WORD";
-      const inputDisabled = (mode === "SPRINT" && !sprintActive) || (mode === "PRACTICE" && !practiceActive && !isPracticeWord);
+      const inputDisabled = (mode === "SPRINT" && !sprintActive) || (mode === "PRACTICE" && !practiceActive);
       const showResult = mode === "SPRINT" && !sprintActive && sprintResult && total > 0;
-      const showStartScreen = (mode === "SPRINT" && !sprintActive && !sprintResult) || (mode === "PRACTICE" && !practiceActive && !isPracticeWord);
+      const showStartScreen = (mode === "SPRINT" && !sprintActive && !sprintResult) || (mode === "PRACTICE" && !practiceActive);
 
       // Pills
       Array.from(el.pills.children).forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.key === direction);
-        btn.disabled = sprintActive || (practiceActive && !isPracticeWord);
+        btn.disabled = sprintActive || practiceActive;
       });
 
       // Mode toggle
@@ -797,8 +788,9 @@
         el.promptTimer.textContent = `${mins}:${secs}`;
         el.promptTimer.className = `prompt-timer${warn ? " warn" : ""}`;
       } else if (mode === "PRACTICE" && practiceActive) {
+        const warnAt = (direction === "WORD" ? state.wordTimeout : state.practiceTimeout) > 10 ? 5 : 2;
         el.promptTimer.textContent = `${practiceTimeLeft}s`;
-        el.promptTimer.className = `prompt-timer${practiceTimeLeft <= 2 ? " warn" : ""}`;
+        el.promptTimer.className = `prompt-timer${practiceTimeLeft <= warnAt ? " warn" : ""}`;
       } else {
         el.promptTimer.textContent = "";
         el.promptTimer.className = "prompt-timer";
@@ -824,17 +816,19 @@
         if (el.input.maxLength !== newMaxLength) el.input.maxLength = newMaxLength;
       }
 
-      // Timeout toggle — practice idle only, not word mode
-      const showTimeout = mode === "PRACTICE" && !practiceActive && !isPracticeWord;
+      // Timeout toggle — practice idle only
+      const showTimeout = mode === "PRACTICE" && !practiceActive;
       el.timeoutRow.classList.toggle("hidden", !showTimeout);
       if (showTimeout) {
-        Array.from(el.timeoutRow.children).forEach(btn => {
-          btn.classList.toggle("active", Number(btn.dataset.t) === state.practiceTimeout);
-        });
+        const opts = direction === "WORD" ? [10, 30, 60] : [5, 10, 20];
+        const active = direction === "WORD" ? state.wordTimeout : state.practiceTimeout;
+        el.timeoutRow.innerHTML = opts.map(t =>
+          `<button class="timeout-btn${active === t ? " active" : ""}" data-t="${t}">${t === 60 ? "1m" : t + "s"}</button>`
+        ).join("");
       }
 
-      // Action button — Start when idle, Stop during sprint
-      const showAction = showStartScreen || (mode === "SPRINT" && sprintActive);
+      // Action button — Start when idle, Stop during sprint or active practice
+      const showAction = showStartScreen || (mode === "SPRINT" && sprintActive) || (mode === "PRACTICE" && practiceActive);
       el.actionRow.classList.toggle("hidden", !showAction);
       if (showAction) {
         if (showStartScreen) {
@@ -844,7 +838,7 @@
         } else {
           el.actionBtn.textContent = "Stop";
           el.actionBtn.className = "btn-secondary";
-          el.actionBtn.onclick = endSprint;
+          el.actionBtn.onclick = mode === "SPRINT" ? endSprint : () => { stopPractice(); render(); };
         }
       }
     }
@@ -918,8 +912,7 @@
     el.input.addEventListener("input", (e) => {
       const v = e.target.value;
       if (state.mode === "SPRINT" && !state.sprintActive) return;
-      const _isPracticeWord = state.mode === "PRACTICE" && state.direction === "WORD";
-      if (state.mode === "PRACTICE" && !state.practiceActive && !_isPracticeWord) return;
+      if (state.mode === "PRACTICE" && !state.practiceActive) return;
       if (state.prompt.kind === "N2L") {
         const c = v.trim();
         if (c.length >= 1 && /^[A-Za-z]$/.test(c)) submit(c);
@@ -941,7 +934,9 @@
     el.timeoutRow.addEventListener("click", (e) => {
       const btn = e.target.closest("[data-t]");
       if (!btn) return;
-      state.practiceTimeout = Number(btn.dataset.t);
+      const t = Number(btn.dataset.t);
+      if (state.direction === "WORD") state.wordTimeout = t;
+      else state.practiceTimeout = t;
       render();
     });
 
