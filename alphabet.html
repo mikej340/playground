@@ -851,10 +851,19 @@
           <div class="stats-section-title">Letter → Number</div>
           <div class="stats-grid">${LETTERS.map(l => cell("L2N", l)).join("")}</div>
         </div>
+        <button class="btn-secondary" id="statsClear">Clear all stats</button>
       `;
       document.getElementById("statsClose").addEventListener("click", () => {
         state.statsOpen = false;
         render();
+      });
+      document.getElementById("statsClear").addEventListener("click", () => {
+        if (!confirm("Clear all stats and sprint bests?")) return;
+        letterStats = { N2L: emptyProfile(), L2N: emptyProfile() };
+        sprintBests = [];
+        localStorage.removeItem("alphabet-trainer-stats");
+        localStorage.removeItem("alphabet-trainer-sprints");
+        renderStats();
       });
     }
 
