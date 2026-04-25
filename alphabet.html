@@ -602,6 +602,9 @@
       if (state.prompt.kind === "N2L") {
         const c = v.trim();
         if (c.length >= 1 && /^[A-Za-z]$/.test(c)) submit(c);
+      } else if (state.prompt.kind === "L2N") {
+        const c = v.trim();
+        if (c.length === state.prompt.answer.length) submit(c);
       }
     });
 
