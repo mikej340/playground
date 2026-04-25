@@ -239,7 +239,7 @@
 }
 .counter .slash { color: #a8a29e; }
 
-.action-row { padding-top: 8px; }
+.action-row { padding-bottom: 4px; }
 
 /* Animations */
 .pulse-ok { animation: po 0.35s ease-out; }
@@ -273,11 +273,6 @@
         <button class="btn-primary mt-lg" id="againBtn">Again</button>
       </div>
 
-  <!-- Start screen -->
-  <div class="result hidden" id="startScreen">
-    <button class="btn-primary lg" id="startBtn">Start</button>
-  </div>
-
   <!-- Active prompt -->
   <div class="stage-inner" id="active">
     <div class="prompt" id="prompt">A</div>
@@ -299,18 +294,18 @@
 
 <!-- Bottom controls -->
 <div class="controls">
+  <!-- Action button (Start / Stop) — above pills -->
+  <div class="action-row hidden" id="actionRow">
+    <button class="btn-primary" id="actionBtn">Start</button>
+  </div>
+
   <!-- Direction pills -->
   <div class="pills" id="pills"></div>
 
-  <!-- Mode + counter/timer -->
+  <!-- Mode toggle -->
   <div class="toolbar">
     <div class="mode-toggle" id="modeToggle"></div>
     <div id="statusReadout"></div>
-  </div>
-
-  <!-- Action button -->
-  <div class="action-row hidden" id="actionRow">
-    <button class="btn-secondary" id="actionBtn">Reset</button>
   </div>
 </div>
 
@@ -446,8 +441,6 @@
       resultScore: document.getElementById("resultScore"),
       resultMeta: document.getElementById("resultMeta"),
       againBtn: document.getElementById("againBtn"),
-      startScreen: document.getElementById("startScreen"),
-      startBtn: document.getElementById("startBtn"),
       active: document.getElementById("active"),
       prompt: document.getElementById("prompt"),
       input: document.getElementById("input"),
@@ -697,7 +690,6 @@
 
       // Stage panels
       el.result.classList.toggle("hidden", !showResult);
-      el.startScreen.classList.toggle("hidden", !showStartScreen);
       el.active.classList.toggle("hidden", showResult || showStartScreen);
 
       if (showResult) {
@@ -716,12 +708,19 @@
         if (el.input.maxLength !== newMaxLength) el.input.maxLength = newMaxLength;
       }
 
-      // Action button — sprint stop only; practice auto-stops on timeout
-      const showAction = mode === "SPRINT" && sprintActive;
+      // Action button — Start when idle, Stop during sprint
+      const showAction = showStartScreen || (mode === "SPRINT" && sprintActive);
       el.actionRow.classList.toggle("hidden", !showAction);
       if (showAction) {
-        el.actionBtn.textContent = "Stop";
-        el.actionBtn.onclick = endSprint;
+        if (showStartScreen) {
+          el.actionBtn.textContent = "Start";
+          el.actionBtn.className = "btn-primary";
+          el.actionBtn.onclick = () => { if (state.mode === "SPRINT") startSprint(); else startPractice(); };
+        } else {
+          el.actionBtn.textContent = "Stop";
+          el.actionBtn.className = "btn-secondary";
+          el.actionBtn.onclick = endSprint;
+        }
       }
     }
 
@@ -747,10 +746,6 @@
       }
     });
 
-    el.startBtn.addEventListener("click", () => {
-      if (state.mode === "SPRINT") startSprint();
-      else startPractice();
-    });
     el.againBtn.addEventListener("click", startSprint);
 
     // ============ Keyboard / scroll fix backstop ============
