@@ -572,8 +572,10 @@
         el.prompt.textContent = prompt.question;
         el.prompt.classList.toggle("word", prompt.kind === "WORD");
         el.input.disabled = inputDisabled;
-        el.input.inputMode = prompt.kind === "L2N" ? "numeric" : "text";
-        el.input.maxLength = prompt.kind === "WORD" ? 20 : (prompt.kind === "L2N" ? 3 : 2);
+        const newInputMode = prompt.kind === "L2N" ? "numeric" : "text";
+        if (el.input.inputMode !== newInputMode) el.input.inputMode = newInputMode;
+        const newMaxLength = prompt.kind === "WORD" ? 20 : (prompt.kind === "L2N" ? 3 : 2);
+        if (el.input.maxLength !== newMaxLength) el.input.maxLength = newMaxLength;
       }
 
       // Action button
