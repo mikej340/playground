@@ -775,6 +775,7 @@
       // Mode toggle
       Array.from(el.modeToggle.children).forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.key === mode);
+        btn.disabled = sprintActive || practiceActive;
       });
 
       // Stats overlay
