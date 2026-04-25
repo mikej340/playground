@@ -109,6 +109,15 @@
 }
 .feedback .ok { color: #15803d; }
 .feedback .bad { color: #b91c1c; }
+.prompt-timer {
+  height: 20px;
+  margin-top: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: #a8a29e;
+}
+.prompt-timer.warn { color: #c2410c; }
 
 /* Result screen */
 .result {
@@ -284,6 +293,7 @@
       inputmode="text"
     />
     <div class="feedback" id="feedback"></div>
+    <div class="prompt-timer" id="promptTimer"></div>
   </div>
 </div>
 
@@ -442,6 +452,7 @@
       prompt: document.getElementById("prompt"),
       input: document.getElementById("input"),
       feedback: document.getElementById("feedback"),
+      promptTimer: document.getElementById("promptTimer"),
       pills: document.getElementById("pills"),
       modeToggle: document.getElementById("modeToggle"),
       statusReadout: document.getElementById("statusReadout"),
@@ -659,16 +670,23 @@
         btn.classList.toggle("active", btn.dataset.key === mode);
       });
 
-      // Status readout
+      // Status readout — sprint timer only; practice countdown lives in the stage
       if (mode === "SPRINT") {
         const mins = Math.floor(timeLeft / 60);
         const secs = String(timeLeft % 60).padStart(2, "0");
         const warn = timeLeft <= 10 && sprintActive;
         el.statusReadout.innerHTML = `<div class="timer ${warn ? "warn" : ""}">${mins}:${secs}</div>`;
-      } else if (practiceActive) {
-        el.statusReadout.innerHTML = `<div class="timer ${practiceTimeLeft <= 2 ? "warn" : ""}">${practiceTimeLeft}s</div>`;
       } else {
         el.statusReadout.innerHTML = "";
+      }
+
+      // Practice countdown (below input, stays above keyboard)
+      if (mode === "PRACTICE" && practiceActive) {
+        el.promptTimer.textContent = `${practiceTimeLeft}s`;
+        el.promptTimer.className = `prompt-timer${practiceTimeLeft <= 2 ? " warn" : ""}`;
+      } else {
+        el.promptTimer.textContent = "";
+        el.promptTimer.className = "prompt-timer";
       }
 
       // Stage panels
