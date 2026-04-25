@@ -482,15 +482,18 @@
     }
 
     let sprintBests = (() => {
-      try { return JSON.parse(localStorage.getItem("alphabet-trainer-sprints") || "[]"); }
-      catch { return []; }
+      try {
+        const raw = JSON.parse(localStorage.getItem("alphabet-trainer-sprints") || "{}");
+        return Array.isArray(raw) ? {} : raw;
+      } catch { return {}; }
     })();
 
-    function saveSprintBest(correct, wrong) {
-      sprintBests.push({ c: correct, w: wrong });
-      sprintBests.sort((a, b) => b.c - a.c || a.w - b.w);
-      sprintBests = sprintBests.slice(0, 5);
-      localStorage.setItem("alphabet-trainer-sprints", JSON.stringify(sprintBests));
+    function saveSprintBest(direction, correct, wrong) {
+      const cur = sprintBests[direction];
+      if (!cur || correct > cur.c || (correct === cur.c && wrong < cur.w)) {
+        sprintBests[direction] = { c: correct, w: wrong };
+        localStorage.setItem("alphabet-trainer-sprints", JSON.stringify(sprintBests));
+      }
     }
 
     function recordAttempt(kind, letter, correct, elapsedMs) {
@@ -632,7 +635,7 @@
           state.timeLeft = 0;
           state.sprintActive = false;
           state.sprintResult = state.sprintResult ?? "done";
-          saveSprintBest(state.stats.correct, state.stats.wrong);
+          saveSprintBest(state.direction, state.stats.correct, state.stats.wrong);
           clearInterval(timerId);
           timerId = null;
         }
@@ -864,16 +867,19 @@
         return `<div class="stats-cell ${cls}"><div class="stats-letter">${letter}</div><div class="stats-num">${acc}%<br>${avgS}</div></div>`;
       }
 
-      const sprintHTML = sprintBests.length === 0
+      const SPRINT_MODES = [["N2L","N→L"],["L2N","L→N"],["MIX","Mix"],["WORD","Word"]];
+      const sprintRows = SPRINT_MODES.filter(([k]) => sprintBests[k]).map(([k, label]) => {
+        const b = sprintBests[k];
+        const detail = b.w === 0 ? "all correct" : `${b.w} incorrect`;
+        return `<div class="sprint-row">
+          <span class="sprint-rank">${label}</span>
+          <span class="sprint-score">${b.c}</span>
+          <span class="sprint-detail">(${detail})</span>
+        </div>`;
+      });
+      const sprintHTML = sprintRows.length === 0
         ? `<div class="sprint-empty">No completed sprints yet</div>`
-        : sprintBests.map((b, i) => {
-            const detail = b.w === 0 ? "all correct" : `${b.w} incorrect`;
-            return `<div class="sprint-row">
-              <span class="sprint-rank">#${i + 1}</span>
-              <span class="sprint-score">${b.c}</span>
-              <span class="sprint-detail">(${detail})</span>
-            </div>`;
-          }).join("");
+        : sprintRows.join("");
 
       el.statsView.innerHTML = `
         <div class="stats-header">
@@ -901,7 +907,7 @@
       document.getElementById("statsClear").addEventListener("click", () => {
         if (!confirm("Clear all stats and sprint bests?")) return;
         letterStats = { N2L: emptyProfile(), L2N: emptyProfile() };
-        sprintBests = [];
+        sprintBests = {};
         localStorage.removeItem("alphabet-trainer-stats");
         localStorage.removeItem("alphabet-trainer-sprints");
         renderStats();
