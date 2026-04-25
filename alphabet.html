@@ -554,6 +554,8 @@
 
     function startPromptTimer() {
       clearInterval(practiceTimerId);
+      practiceTimerId = null;
+      if (state.prompt.kind === "WORD") return;
       state.practiceTimeLeft = 5;
       promptShownAt = Date.now();
       render();
