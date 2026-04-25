@@ -83,6 +83,11 @@
   font-size: 30px;
   letter-spacing: 0.05em;
 }
+.prompt.status {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 28px;
+  letter-spacing: 0.04em;
+}
 .input {
   margin-top: 40px;
   width: 100%;
@@ -119,12 +124,35 @@
 }
 .prompt-timer.warn { color: #c2410c; }
 
-/* Result screen */
+/* Result overlay */
+.result-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 25, 23, 0.4);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
 .result {
   width: 100%;
   max-width: 384px;
   text-align: center;
   margin: 0 auto;
+  background: #f5f5f4;
+  border-radius: 20px;
+  padding: 18px 16px 16px;
+}
+.result-head {
+  display: flex;
+  justify-content: flex-end;
+}
+.result-close {
+  font-size: 20px;
+  line-height: 1;
+  color: #57534e;
+  padding: 2px 6px;
 }
 .result-score {
   font-size: 72px;
@@ -143,8 +171,11 @@
   color: #57534e;
   margin-top: 8px;
 }
-.result-score.ready {
-  font-size: 48px;
+.result-actions {
+  margin-top: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 /* Buttons */
@@ -368,17 +399,25 @@
     <!-- Stats view (full-screen overlay) -->
     <div class="stats-view hidden" id="statsView"></div>
 
-    <!-- Stage -->
-    <div class="stage" id="stage">
-      <!-- Idle / Result screen -->
-      <div class="result hidden" id="result">
-        <div class="result-meta" id="resultMode">Practice · N→L</div>
+    <!-- Result overlay -->
+    <div class="result-overlay hidden" id="resultOverlay">
+      <div class="result" id="result">
+        <div class="result-head">
+          <button class="result-close" id="resultClose">✕</button>
+        </div>
+        <div class="result-meta" id="resultMode">Sprint · N→L</div>
         <div class="result-score" id="resultScore">0</div>
         <div class="result-meta" id="resultMeta">0% · streak 0</div>
         <div class="result-best" id="resultBest">Sprint best: —</div>
-        <button class="btn-primary mt-lg" id="againBtn">Again</button>
+        <div class="result-actions">
+          <button class="btn-primary" id="againBtn">Try again</button>
+          <button class="btn-secondary" id="closeBtn">Close</button>
+        </div>
       </div>
+    </div>
 
+    <!-- Stage -->
+    <div class="stage" id="stage">
   <!-- Active prompt -->
   <div class="stage-inner" id="active">
     <div class="prompt" id="prompt">A</div>
@@ -541,6 +580,7 @@
       sprintActive: false,
       timeLeft: 60,
       sprintResult: null,
+      showSprintOverlay: false,
       practiceActive: false,
       practiceTimeout: 5,
       wordTimeout: 30,
@@ -557,12 +597,15 @@
     const el = {
       app: document.getElementById("app"),
       stage: document.getElementById("stage"),
+      resultOverlay: document.getElementById("resultOverlay"),
       result: document.getElementById("result"),
       resultMode: document.getElementById("resultMode"),
       resultScore: document.getElementById("resultScore"),
       resultMeta: document.getElementById("resultMeta"),
       resultBest: document.getElementById("resultBest"),
       againBtn: document.getElementById("againBtn"),
+      closeBtn: document.getElementById("closeBtn"),
+      resultClose: document.getElementById("resultClose"),
       active: document.getElementById("active"),
       prompt: document.getElementById("prompt"),
       input: document.getElementById("input"),
@@ -612,6 +655,7 @@
     function setDirection(d) {
       if (state.sprintActive || state.practiceActive) return;
       state.direction = d;
+      state.showSprintOverlay = false;
       state.prompt = makePrompt(d);
       el.input.value = "";
       clearFeedback();
@@ -629,6 +673,7 @@
       state.stats = { correct: 0, wrong: 0, streak: 0, best: 0 };
       state.timeLeft = 60;
       state.sprintResult = null;
+      state.showSprintOverlay = false;
       state.sprintActive = true;
       state.prompt = makePrompt(state.direction);
       el.input.value = "";
@@ -642,6 +687,7 @@
           state.timeLeft = 0;
           state.sprintActive = false;
           state.sprintResult = state.sprintResult ?? "done";
+          state.showSprintOverlay = true;
           saveSprintBest(state.direction, state.stats.correct, state.stats.wrong);
           clearInterval(timerId);
           timerId = null;
@@ -657,6 +703,7 @@
         timerId = null;
       }
       state.sprintResult = null;
+      state.showSprintOverlay = false;
       state.timeLeft = 60;
       state.stats = { correct: 0, wrong: 0, streak: 0, best: 0 };
       state.prompt = makePrompt(state.direction);
@@ -704,6 +751,7 @@
     function reset() {
       state.stats = { correct: 0, wrong: 0, streak: 0, best: 0 };
       state.sprintResult = null;
+      state.showSprintOverlay = false;
       state.prompt = makePrompt(state.direction);
       el.input.value = "";
       clearFeedback();
@@ -782,7 +830,6 @@
       const accuracy = total === 0 ? 0 : Math.round((stats.correct / total) * 100);
       const inputDisabled = (mode === "SPRINT" && !sprintActive) || (mode === "PRACTICE" && !practiceActive);
       const activeSession = (mode === "SPRINT" && sprintActive) || (mode === "PRACTICE" && practiceActive);
-      const idleScreen = !activeSession;
       const showSprintSummary = mode === "SPRINT" && !sprintActive && sprintResult && total > 0;
 
       // Pills
@@ -816,11 +863,9 @@
         el.promptTimer.className = "prompt-timer";
       }
 
-      // Stage panels
-      el.result.classList.toggle("hidden", !idleScreen);
-      el.active.classList.toggle("hidden", idleScreen);
-
-      if (idleScreen) {
+      // Result overlay (sprint timeout only)
+      el.resultOverlay.classList.toggle("hidden", !state.showSprintOverlay);
+      if (state.showSprintOverlay) {
         const modeLabel = MODES[mode];
         const directionLabel = DIRECTIONS[direction];
         const best = sprintBests[direction];
@@ -828,33 +873,25 @@
 
         el.resultMode.textContent = `${modeLabel} · ${directionLabel}`;
         el.resultBest.textContent = `Sprint best: ${bestText}`;
-      }
-
-      if (showSprintSummary) {
-        el.resultScore.classList.remove("ready");
-        el.resultScore.textContent = stats.correct;
-        el.resultMeta.textContent = `${accuracy}% · streak ${stats.best}`;
-        el.againBtn.textContent = "Again";
-      } else if (idleScreen) {
-        el.resultScore.classList.add("ready");
-        el.resultScore.textContent = "Ready";
-        el.resultMeta.textContent = mode === "SPRINT" ? "60s sprint" : "Timed prompts";
-        el.againBtn.textContent = "Start";
-      }
-      if (idleScreen) {
-        el.againBtn.onclick = () => { if (state.mode === "SPRINT") startSprint(); else startPractice(); };
+        if (showSprintSummary) {
+          el.resultScore.textContent = stats.correct;
+          el.resultMeta.textContent = `${accuracy}% · streak ${stats.best}`;
+        }
       }
 
       // Active prompt
       if (activeSession) {
         el.prompt.textContent = prompt.question;
-        el.prompt.classList.toggle("word", prompt.kind === "WORD");
-        el.input.disabled = inputDisabled;
-        const newInputMode = prompt.kind === "L2N" ? "numeric" : "text";
-        if (el.input.inputMode !== newInputMode) el.input.inputMode = newInputMode;
-        const newMaxLength = prompt.kind === "WORD" ? 20 : (prompt.kind === "L2N" ? 3 : 2);
-        if (el.input.maxLength !== newMaxLength) el.input.maxLength = newMaxLength;
+      } else {
+        el.prompt.textContent = `${MODES[mode]} · ${DIRECTIONS[direction]}`;
       }
+      el.prompt.classList.toggle("word", activeSession && prompt.kind === "WORD");
+      el.prompt.classList.toggle("status", !activeSession);
+      el.input.disabled = inputDisabled;
+      const newInputMode = prompt.kind === "L2N" ? "numeric" : "text";
+      if (el.input.inputMode !== newInputMode) el.input.inputMode = newInputMode;
+      const newMaxLength = prompt.kind === "WORD" ? 20 : (prompt.kind === "L2N" ? 3 : 2);
+      if (el.input.maxLength !== newMaxLength) el.input.maxLength = newMaxLength;
 
       // Timeout toggle — practice idle only
       const showTimeout = mode === "PRACTICE" && !practiceActive;
@@ -867,13 +904,16 @@
         ).join("");
       }
 
-      // Action button — Stop during sprint or active practice
-      const showAction = activeSession;
-      el.actionRow.classList.toggle("hidden", !showAction);
-      if (showAction) {
+      // Action button — Start when idle, Stop when active
+      el.actionRow.classList.toggle("hidden", false);
+      if (activeSession) {
         el.actionBtn.textContent = "Stop";
         el.actionBtn.className = "btn-secondary";
         el.actionBtn.onclick = mode === "SPRINT" ? endSprint : () => { stopPractice(); render(); };
+      } else {
+        el.actionBtn.textContent = "Start";
+        el.actionBtn.className = "btn-primary";
+        el.actionBtn.onclick = () => { if (state.mode === "SPRINT") startSprint(); else startPractice(); };
       }
     }
 
@@ -977,6 +1017,19 @@
       renderStats();
       render();
     });
+
+    el.againBtn.addEventListener("click", () => {
+      state.showSprintOverlay = false;
+      startSprint();
+    });
+
+    function closeResultOverlay() {
+      state.showSprintOverlay = false;
+      render();
+    }
+
+    el.closeBtn.addEventListener("click", closeResultOverlay);
+    el.resultClose.addEventListener("click", closeResultOverlay);
 
     // ============ Keyboard / scroll fix backstop ============
     // interactive-widget=resizes-content in the meta tag does the heavy lifting.
