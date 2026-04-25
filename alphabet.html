@@ -677,18 +677,17 @@
         btn.classList.toggle("active", btn.dataset.key === mode);
       });
 
-      // Status readout — sprint timer only; practice countdown lives in the stage
-      if (mode === "SPRINT") {
+      // Status readout — unused now; timers live in the stage above the keyboard
+      el.statusReadout.innerHTML = "";
+
+      // Countdown in stage (below input, stays above keyboard)
+      if (mode === "SPRINT" && sprintActive) {
         const mins = Math.floor(timeLeft / 60);
         const secs = String(timeLeft % 60).padStart(2, "0");
-        const warn = timeLeft <= 10 && sprintActive;
-        el.statusReadout.innerHTML = `<div class="timer ${warn ? "warn" : ""}">${mins}:${secs}</div>`;
-      } else {
-        el.statusReadout.innerHTML = "";
-      }
-
-      // Practice countdown (below input, stays above keyboard)
-      if (mode === "PRACTICE" && practiceActive) {
+        const warn = timeLeft <= 10;
+        el.promptTimer.textContent = `${mins}:${secs}`;
+        el.promptTimer.className = `prompt-timer${warn ? " warn" : ""}`;
+      } else if (mode === "PRACTICE" && practiceActive) {
         el.promptTimer.textContent = `${practiceTimeLeft}s`;
         el.promptTimer.className = `prompt-timer${practiceTimeLeft <= 2 ? " warn" : ""}`;
       } else {
