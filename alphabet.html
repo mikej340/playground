@@ -260,10 +260,76 @@
 
 .hidden { display: none !important; }
 
+/* Stats view */
+.stats-btn {
+  font-size: 12px;
+  font-weight: 500;
+  color: #78716c;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+.stats-btn:active { color: #1c1917; }
+.stats-view {
+  position: fixed;
+  inset: 0;
+  background: #f5f5f4;
+  overflow-y: auto;
+  z-index: 10;
+  padding: 24px 16px 40px;
+}
+.stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.stats-title { font-size: 20px; font-weight: 700; }
+.stats-close {
+  font-size: 20px;
+  line-height: 1;
+  color: #57534e;
+  padding: 4px 8px;
+}
+.stats-section { margin-bottom: 28px; }
+.stats-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #78716c;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 5px;
+}
+.stats-cell {
+  border-radius: 8px;
+  padding: 8px 2px 6px;
+  text-align: center;
+  background: #e7e5e4;
+}
+.stats-cell.none { opacity: 0.35; }
+.stats-cell.good { background: #bbf7d0; }
+.stats-cell.ok   { background: #fef08a; }
+.stats-cell.bad  { background: #fecaca; }
+.stats-letter { font-size: 17px; font-weight: 700; line-height: 1; }
+.stats-num {
+  font-size: 9px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #44403c;
+  margin-top: 3px;
+  line-height: 1.4;
+}
+
   </style>
 </head>
 <body>
   <div class="app" id="app">
+    <!-- Stats view (full-screen overlay) -->
+    <div class="stats-view hidden" id="statsView"></div>
+
     <!-- Stage -->
     <div class="stage" id="stage">
       <!-- Result screen -->
@@ -305,7 +371,7 @@
   <!-- Mode toggle -->
   <div class="toolbar">
     <div class="mode-toggle" id="modeToggle"></div>
-    <div id="statusReadout"></div>
+    <button class="stats-btn" id="statsBtn">Stats</button>
   </div>
 </div>
 
@@ -426,6 +492,7 @@
       sprintResult: null,
       practiceActive: false,
       practiceTimeLeft: 5,
+      statsOpen: false,
     };
 
     let timerId = null;
@@ -451,6 +518,8 @@
       statusReadout: document.getElementById("statusReadout"),
       actionRow: document.getElementById("actionRow"),
       actionBtn: document.getElementById("actionBtn"),
+      statsBtn: document.getElementById("statsBtn"),
+      statsView: document.getElementById("statsView"),
     };
 
     // ============ Build static UI ============
@@ -670,8 +739,8 @@
         btn.classList.toggle("active", btn.dataset.key === mode);
       });
 
-      // Status readout — unused now; timers live in the stage above the keyboard
-      el.statusReadout.innerHTML = "";
+      // Stats overlay
+      el.statsView.classList.toggle("hidden", !state.statsOpen);
 
       // Countdown in stage (below input, stays above keyboard)
       if (mode === "SPRINT" && sprintActive) {
@@ -724,6 +793,44 @@
       }
     }
 
+    // ============ Stats ============
+    function renderStats() {
+      const LETTERS = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i));
+
+      function cell(kind, letter) {
+        const s = letterStats[kind][letter] || { a: 0, w: 0, t: 0 };
+        if (s.a === 0) {
+          return `<div class="stats-cell none"><div class="stats-letter">${letter}</div><div class="stats-num">—</div></div>`;
+        }
+        const correct = s.a - s.w;
+        const acc = Math.round((correct / s.a) * 100);
+        const avgMs = correct > 0 ? s.t / correct : null;
+        const avgS = avgMs != null ? (avgMs / 1000).toFixed(1) + "s" : "—";
+        const cls = acc >= 85 && (avgMs == null || avgMs <= 2500) ? "good"
+                  : acc >= 70 ? "ok" : "bad";
+        return `<div class="stats-cell ${cls}"><div class="stats-letter">${letter}</div><div class="stats-num">${acc}%<br>${avgS}</div></div>`;
+      }
+
+      el.statsView.innerHTML = `
+        <div class="stats-header">
+          <div class="stats-title">Stats</div>
+          <button class="stats-close" id="statsClose">✕</button>
+        </div>
+        <div class="stats-section">
+          <div class="stats-section-title">Number → Letter</div>
+          <div class="stats-grid">${LETTERS.map(l => cell("N2L", l)).join("")}</div>
+        </div>
+        <div class="stats-section">
+          <div class="stats-section-title">Letter → Number</div>
+          <div class="stats-grid">${LETTERS.map(l => cell("L2N", l)).join("")}</div>
+        </div>
+      `;
+      document.getElementById("statsClose").addEventListener("click", () => {
+        state.statsOpen = false;
+        render();
+      });
+    }
+
     // ============ Events ============
     el.input.addEventListener("input", (e) => {
       const v = e.target.value;
@@ -747,6 +854,12 @@
     });
 
     el.againBtn.addEventListener("click", startSprint);
+
+    el.statsBtn.addEventListener("click", () => {
+      state.statsOpen = true;
+      renderStats();
+      render();
+    });
 
     // ============ Keyboard / scroll fix backstop ============
     // interactive-widget=resizes-content in the meta tag does the heavy lifting.
