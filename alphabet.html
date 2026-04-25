@@ -326,14 +326,79 @@
     const randomWord = () => WORDS[Math.floor(Math.random() * WORDS.length)];
     const wordToNumbers = (w) => w.toUpperCase().split("").map(numberFor).join(" ");
 
+    // ============ Stats & weighting ============
+    const MIN_ATTEMPTS = 4;
+
+    function emptyProfile() {
+      return Object.fromEntries(
+        Array.from({ length: 26 }, (_, i) => [String.fromCharCode(65 + i), { a: 0, w: 0, t: 0 }])
+      );
+    }
+
+    function loadStats() {
+      try {
+        const raw = JSON.parse(localStorage.getItem("alphabet-trainer-stats") || "{}");
+        return {
+          N2L: { ...emptyProfile(), ...(raw.N2L || {}) },
+          L2N: { ...emptyProfile(), ...(raw.L2N || {}) },
+        };
+      } catch {
+        return { N2L: emptyProfile(), L2N: emptyProfile() };
+      }
+    }
+
+    function saveStats() {
+      localStorage.setItem("alphabet-trainer-stats", JSON.stringify(letterStats));
+    }
+
+    let letterStats = loadStats();
+
+    function computeWeights(kind) {
+      const entries = Array.from({ length: 26 }, (_, i) => {
+        const letter = String.fromCharCode(65 + i);
+        const s = letterStats[kind][letter] || { a: 0, w: 0, t: 0 };
+        const correct = s.a - s.w;
+        const errorRate = s.a > 0 ? s.w / s.a : 0;
+        const avgTime = correct > 0 ? s.t / correct : 0;
+        return { errorRate, avgTime, attempts: s.a };
+      });
+      const maxAvgTime = Math.max(...entries.map(e => e.avgTime), 1);
+      return entries.map(({ errorRate, avgTime, attempts }) => {
+        const confidence = Math.min(attempts / MIN_ATTEMPTS, 1);
+        const normTime = avgTime / maxAvgTime;
+        return 1 + confidence * (errorRate * 2 + normTime * 2);
+      });
+    }
+
+    function weightedPickN(kind) {
+      const weights = computeWeights(kind);
+      const total = weights.reduce((a, b) => a + b, 0);
+      let r = Math.random() * total;
+      for (let i = 0; i < weights.length; i++) {
+        r -= weights[i];
+        if (r <= 0) return i + 1;
+      }
+      return 26;
+    }
+
+    function recordAttempt(kind, letter, correct, elapsedMs) {
+      if (kind === "WORD") return;
+      const s = letterStats[kind][letter] || { a: 0, w: 0, t: 0 };
+      s.a++;
+      if (!correct) s.w++;
+      if (correct) s.t += elapsedMs;
+      letterStats[kind][letter] = s;
+      saveStats();
+    }
+
     function makePrompt(direction) {
       if (direction === "WORD") {
         const w = randomWord();
         return { kind: "WORD", question: wordToNumbers(w), answer: w.toUpperCase() };
       }
-      const n = Math.floor(Math.random() * 26) + 1;
       let dir = direction;
       if (direction === "MIX") dir = Math.random() < 0.5 ? "N2L" : "L2N";
+      const n = weightedPickN(dir);
       if (dir === "N2L") return { kind: "N2L", question: String(n), answer: letterFor(n) };
       return { kind: "L2N", question: letterFor(n), answer: String(n) };
     }
@@ -354,9 +419,13 @@
       sprintActive: false,
       timeLeft: 60,
       sprintResult: null,
+      practiceActive: false,
+      practiceTimeLeft: 5,
     };
 
     let timerId = null;
+    let practiceTimerId = null;
+    let promptShownAt = null;
     let feedbackTimeout = null;
 
     // ============ DOM refs ============
@@ -402,9 +471,9 @@
         btn.dataset.key = k;
         btn.addEventListener("click", () => {
           if (state.sprintActive) endSprint();
+          if (state.practiceActive) stopPractice();
           state.mode = k;
           reset();
-          render();
         });
         el.modeToggle.appendChild(btn);
       });
@@ -412,7 +481,7 @@
 
     // ============ Actions ============
     function setDirection(d) {
-      if (state.sprintActive) return;
+      if (state.sprintActive || state.practiceActive) return;
       state.direction = d;
       state.prompt = makePrompt(d);
       el.input.value = "";
@@ -424,6 +493,7 @@
       state.prompt = makePrompt(state.direction);
       el.input.value = "";
       render();
+      if (state.mode === "PRACTICE" && state.practiceActive) startPromptTimer();
     }
 
     function startSprint() {
@@ -458,6 +528,41 @@
         timerId = null;
       }
       render();
+    }
+
+    function startPractice() {
+      state.stats = { correct: 0, wrong: 0, streak: 0, best: 0 };
+      state.practiceActive = true;
+      state.prompt = makePrompt(state.direction);
+      el.input.value = "";
+      clearFeedback();
+      render();
+      el.input.focus();
+      startPromptTimer();
+    }
+
+    function startPromptTimer() {
+      clearInterval(practiceTimerId);
+      state.practiceTimeLeft = 5;
+      promptShownAt = Date.now();
+      render();
+      practiceTimerId = setInterval(() => {
+        state.practiceTimeLeft--;
+        if (state.practiceTimeLeft <= 0) {
+          clearInterval(practiceTimerId);
+          practiceTimerId = null;
+          state.practiceActive = false;
+          render();
+        } else {
+          render();
+        }
+      }, 1000);
+    }
+
+    function stopPractice() {
+      clearInterval(practiceTimerId);
+      practiceTimerId = null;
+      state.practiceActive = false;
     }
 
     function reset() {
@@ -502,7 +607,10 @@
     function submit(value) {
       const normalized = normalize(value, state.prompt.kind);
       if (!normalized) return;
+      if (state.mode === "PRACTICE" && !state.practiceActive) return;
       const ok = normalized === state.prompt.answer;
+      const elapsedMs = promptShownAt ? Date.now() - promptShownAt : 0;
+      const letter = state.prompt.kind === "N2L" ? state.prompt.answer : state.prompt.question;
 
       if (ok) {
         const streak = state.stats.streak + 1;
@@ -512,12 +620,16 @@
           streak,
           best: Math.max(state.stats.best, streak),
         };
-        if (state.mode === "PRACTICE") showFeedback("ok");
+        if (state.mode === "PRACTICE") {
+          recordAttempt(state.prompt.kind, letter, true, elapsedMs);
+          showFeedback("ok");
+        }
         nextPrompt();
       } else {
         state.stats.wrong++;
         state.stats.streak = 0;
         if (state.mode === "PRACTICE") {
+          recordAttempt(state.prompt.kind, letter, false, elapsedMs);
           showFeedback("bad", state.prompt.answer);
           el.input.value = "";
           render();
@@ -529,17 +641,17 @@
 
     // ============ Render ============
     function render() {
-      const { mode, direction, prompt, stats, sprintActive, timeLeft, sprintResult } = state;
+      const { mode, direction, prompt, stats, sprintActive, timeLeft, sprintResult, practiceActive, practiceTimeLeft } = state;
       const total = stats.correct + stats.wrong;
       const accuracy = total === 0 ? 0 : Math.round((stats.correct / total) * 100);
-      const inputDisabled = mode === "SPRINT" && !sprintActive;
+      const inputDisabled = (mode === "SPRINT" && !sprintActive) || (mode === "PRACTICE" && !practiceActive);
       const showResult = mode === "SPRINT" && !sprintActive && sprintResult && total > 0;
-      const showStartScreen = mode === "SPRINT" && !sprintActive && !sprintResult;
+      const showStartScreen = (mode === "SPRINT" && !sprintActive && !sprintResult) || (mode === "PRACTICE" && !practiceActive);
 
       // Pills
       Array.from(el.pills.children).forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.key === direction);
-        btn.disabled = sprintActive;
+        btn.disabled = sprintActive || practiceActive;
       });
 
       // Mode toggle
@@ -547,14 +659,16 @@
         btn.classList.toggle("active", btn.dataset.key === mode);
       });
 
-      // Status readout (timer or counter)
+      // Status readout
       if (mode === "SPRINT") {
         const mins = Math.floor(timeLeft / 60);
         const secs = String(timeLeft % 60).padStart(2, "0");
         const warn = timeLeft <= 10 && sprintActive;
         el.statusReadout.innerHTML = `<div class="timer ${warn ? "warn" : ""}">${mins}:${secs}</div>`;
+      } else if (practiceActive) {
+        el.statusReadout.innerHTML = `<div class="timer ${practiceTimeLeft <= 2 ? "warn" : ""}">${practiceTimeLeft}s</div>`;
       } else {
-        el.statusReadout.innerHTML = `<div class="counter">${stats.correct}<span class="slash">/</span>${total}</div>`;
+        el.statusReadout.innerHTML = "";
       }
 
       // Stage panels
@@ -578,20 +692,12 @@
         if (el.input.maxLength !== newMaxLength) el.input.maxLength = newMaxLength;
       }
 
-      // Action button
-      const showAction =
-        !showResult &&
-        !showStartScreen &&
-        ((mode === "SPRINT" && sprintActive) || mode === "PRACTICE");
+      // Action button — sprint stop only; practice auto-stops on timeout
+      const showAction = mode === "SPRINT" && sprintActive;
       el.actionRow.classList.toggle("hidden", !showAction);
       if (showAction) {
-        if (mode === "SPRINT" && sprintActive) {
-          el.actionBtn.textContent = "Stop";
-          el.actionBtn.onclick = endSprint;
-        } else {
-          el.actionBtn.textContent = "Reset";
-          el.actionBtn.onclick = reset;
-        }
+        el.actionBtn.textContent = "Stop";
+        el.actionBtn.onclick = endSprint;
       }
     }
 
@@ -599,6 +705,7 @@
     el.input.addEventListener("input", (e) => {
       const v = e.target.value;
       if (state.mode === "SPRINT" && !state.sprintActive) return;
+      if (state.mode === "PRACTICE" && !state.practiceActive) return;
       if (state.prompt.kind === "N2L") {
         const c = v.trim();
         if (c.length >= 1 && /^[A-Za-z]$/.test(c)) submit(c);
@@ -615,7 +722,10 @@
       }
     });
 
-    el.startBtn.addEventListener("click", startSprint);
+    el.startBtn.addEventListener("click", () => {
+      if (state.mode === "SPRINT") startSprint();
+      else startPractice();
+    });
     el.againBtn.addEventListener("click", startSprint);
 
     // ============ Keyboard / scroll fix backstop ============
