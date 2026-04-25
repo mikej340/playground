@@ -1,345 +1,641 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Alphabet Trainer</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<style>
-  html, body, #root { height: 100%; overflow: hidden; overscroll-behavior: none; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>Alphabet Trainer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      overscroll-behavior: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100%;
+      background: #f5f5f4;
+      color: #1c1917;
+      font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-text-size-adjust: 100%;
+    }
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      background: none;
+      padding: 0;
+      color: inherit;
+      -webkit-tap-highlight-color: transparent;
+    }
+    input {
+      font-family: inherit;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+```
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* Layout */
+.app {
+  width: 100%;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Stage */
+.stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 32px 24px 16px;
+  min-height: 0;
+}
+.stage-inner {
+  width: 100%;
+  text-align: center;
+}
+.prompt {
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.025em;
+  user-select: none;
+  word-break: break-word;
+  font-size: 96px;
+}
+.prompt.word {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 30px;
+  letter-spacing: 0.05em;
+}
+.input {
+  margin-top: 40px;
+  width: 100%;
+  max-width: 320px;
+  text-align: center;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid #d6d3d1;
+  outline: none;
+  padding: 12px 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #1c1917;
+}
+.input:focus { border-bottom-color: #1c1917; }
+.input:disabled { opacity: 0.4; }
+.feedback {
+  height: 24px;
+  margin-top: 12px;
+  font-size: 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.feedback .ok { color: #15803d; }
+.feedback .bad { color: #b91c1c; }
+
+/* Result screen */
+.result {
+  width: 100%;
+  max-width: 384px;
+  text-align: center;
+  margin: 0 auto;
+}
+.result-score {
+  font-size: 72px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+.result-meta {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: #78716c;
+  margin-top: 12px;
+}
+
+/* Buttons */
+.btn-primary {
+  width: 100%;
+  padding: 16px;
+  border-radius: 16px;
+  background: #1c1917;
+  color: #fafaf9;
+  font-size: 16px;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+.btn-primary:active { background: #c2410c; }
+.btn-primary.lg {
+  padding: 20px;
+  font-size: 18px;
+}
+.btn-primary.mt-lg { margin-top: 40px; }
+.btn-secondary {
+  width: 100%;
+  padding: 12px;
+  border-radius: 16px;
+  background: #e7e5e4;
+  color: #57534e;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+.btn-secondary:active { background: #d6d3d1; }
+
+/* Bottom controls */
+.controls {
+  padding: 8px 16px 24px;
+  border-top: 1px solid rgba(231, 229, 228, 0.6);
+}
+.pills {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 12px 0;
+}
+.pill {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 0;
+  border-radius: 9999px;
+  border: 1px solid #d6d3d1;
+  background: white;
+  color: #57534e;
+  transition: all 0.15s;
+}
+.pill.active {
+  background: #1c1917;
+  color: #fafaf9;
+  border-color: #1c1917;
+}
+.pill:disabled { opacity: 0.4; }
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+}
+.mode-toggle {
+  display: flex;
+  gap: 4px;
+  background: #e7e5e4;
+  border-radius: 9999px;
+  padding: 2px;
+}
+.mode-btn {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  color: #57534e;
+  transition: all 0.15s;
+}
+.mode-btn.active {
+  background: #1c1917;
+  color: #fafaf9;
+}
+.timer {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #44403c;
+}
+.timer.warn {
+  color: #c2410c;
+  animation: tk 1s steps(1, end) infinite;
+}
+.counter {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: #78716c;
+}
+.counter .slash { color: #a8a29e; }
+
+.action-row { padding-top: 8px; }
+
+/* Animations */
+.pulse-ok { animation: po 0.35s ease-out; }
+.pulse-bad { animation: sh 0.35s ease-in-out; }
+@keyframes po {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+@keyframes sh {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+@keyframes tk {
+  50% { opacity: 0.4; }
+}
+
+.hidden { display: none !important; }
+```
+
+  </style>
 </head>
 <body>
-<div id="root"></div>
-<script type="text/babel">
-const { useState, useEffect, useRef, useCallback } = React;
+  <div class="app" id="app">
+    <!-- Stage -->
+    <div class="stage" id="stage">
+      <!-- Result screen -->
+      <div class="result hidden" id="result">
+        <div class="result-score" id="resultScore">0</div>
+        <div class="result-meta" id="resultMeta">0% · streak 0</div>
+        <button class="btn-primary mt-lg" id="againBtn">Again</button>
+      </div>
 
-const DIRECTIONS = { N2L: "N→L", L2N: "L→N", MIX: "Mix", WORD: "Word" };
-const MODES = { PRACTICE: "Practice", SPRINT: "Sprint" };
+```
+  <!-- Start screen -->
+  <div class="result hidden" id="startScreen">
+    <button class="btn-primary lg" id="startBtn">Start</button>
+  </div>
 
-const letterFor = (n) => String.fromCharCode(64 + n);
-const numberFor = (l) => l.toUpperCase().charCodeAt(0) - 64;
+  <!-- Active prompt -->
+  <div class="stage-inner" id="active">
+    <div class="prompt" id="prompt">A</div>
+    <input
+      class="input"
+      id="input"
+      type="text"
+      autocomplete="off"
+      autocapitalize="characters"
+      autocorrect="off"
+      spellcheck="false"
+      maxlength="2"
+      inputmode="text"
+    />
+    <div class="feedback" id="feedback"></div>
+  </div>
+</div>
 
-const WORDS = [
-  "cat","dog","run","sky","owl","tea","map","pen","jar","fox",
-  "moon","salt","ship","code","leaf","wolf","jazz","quiz","kite","frog",
-  "echo","rain","wave","mint","bird","harp","comb","drum","vine","zinc",
-  "amber","cloud","piano","river","flame","ghost","pixel","forge","glove","tiger",
-  "onion","quilt","bravo","clasp","dwarf","ember","flint","glyph","haven","ivory",
-  "garden","puzzle","shadow","rhythm","wizard","jungle","silver","canvas","breeze","velvet",
-  "lantern","compass","quantum","whisper","harvest","mystery","crystal","journey","twilight","kingdom",
-];
+<!-- Bottom controls -->
+<div class="controls">
+  <!-- Direction pills -->
+  <div class="pills" id="pills"></div>
 
-const randomWord = () => WORDS[Math.floor(Math.random() * WORDS.length)];
-const wordToNumbers = (w) => w.toUpperCase().split("").map(numberFor).join(" ");
+  <!-- Mode + counter/timer -->
+  <div class="toolbar">
+    <div class="mode-toggle" id="modeToggle"></div>
+    <div id="statusReadout"></div>
+  </div>
 
-function makePrompt(direction) {
-  if (direction === "WORD") {
-    const w = randomWord();
-    return { kind: "WORD", question: wordToNumbers(w), answer: w.toUpperCase() };
-  }
-  const n = Math.floor(Math.random() * 26) + 1;
-  let dir = direction;
-  if (direction === "MIX") dir = Math.random() < 0.5 ? "N2L" : "L2N";
-  if (dir === "N2L") return { kind: "N2L", question: String(n), answer: letterFor(n) };
-  return { kind: "L2N", question: letterFor(n), answer: String(n) };
-}
+  <!-- Action button -->
+  <div class="action-row hidden" id="actionRow">
+    <button class="btn-secondary" id="actionBtn">Reset</button>
+  </div>
+</div>
+```
 
-function normalize(input, kind) {
-  const s = input.trim();
-  if (!s) return "";
-  if (kind === "L2N") return s.replace(/^0+/, "");
-  return s.toUpperCase();
-}
+  </div>
 
-function AlphabetTrainer() {
-  const [mode, setMode] = useState("PRACTICE");
-  const [direction, setDirection] = useState("N2L");
-  const [prompt, setPrompt] = useState(() => makePrompt("N2L"));
-  const [input, setInput] = useState("");
-  const [feedback, setFeedback] = useState(null);
-  const [stats, setStats] = useState({ correct: 0, wrong: 0, streak: 0, best: 0 });
-  const [sprintActive, setSprintActive] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(60);
-  const [sprintResult, setSprintResult] = useState(null);
-  const inputRef = useRef(null);
-  const tickRef = useRef(null);
-  const fbRef = useRef(null);
+  <script>
+    // ============ Constants ============
+    const DIRECTIONS = { N2L: "N→L", L2N: "L→N", MIX: "Mix", WORD: "Word" };
+    const MODES = { PRACTICE: "Practice", SPRINT: "Sprint" };
 
-  const [vh, setVh] = useState(null);
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const update = () => setVh(vv.height);
-    update();
-    vv.addEventListener("resize", update);
-    vv.addEventListener("scroll", update);
-    return () => {
-      vv.removeEventListener("resize", update);
-      vv.removeEventListener("scroll", update);
+    const WORDS = [
+      "cat","dog","run","sky","owl","tea","map","pen","jar","fox",
+      "moon","salt","ship","code","leaf","wolf","jazz","quiz","kite","frog",
+      "echo","rain","wave","mint","bird","harp","comb","drum","vine","zinc",
+      "amber","cloud","piano","river","flame","ghost","pixel","forge","glove","tiger",
+      "onion","quilt","bravo","clasp","dwarf","ember","flint","glyph","haven","ivory",
+      "garden","puzzle","shadow","rhythm","wizard","jungle","silver","canvas","breeze","velvet",
+      "lantern","compass","quantum","whisper","harvest","mystery","crystal","journey","twilight","kingdom",
+    ];
+
+    const letterFor = (n) => String.fromCharCode(64 + n);
+    const numberFor = (l) => l.toUpperCase().charCodeAt(0) - 64;
+    const randomWord = () => WORDS[Math.floor(Math.random() * WORDS.length)];
+    const wordToNumbers = (w) => w.toUpperCase().split("").map(numberFor).join(" ");
+
+    function makePrompt(direction) {
+      if (direction === "WORD") {
+        const w = randomWord();
+        return { kind: "WORD", question: wordToNumbers(w), answer: w.toUpperCase() };
+      }
+      const n = Math.floor(Math.random() * 26) + 1;
+      let dir = direction;
+      if (direction === "MIX") dir = Math.random() < 0.5 ? "N2L" : "L2N";
+      if (dir === "N2L") return { kind: "N2L", question: String(n), answer: letterFor(n) };
+      return { kind: "L2N", question: letterFor(n), answer: String(n) };
+    }
+
+    function normalize(input, kind) {
+      const s = input.trim();
+      if (!s) return "";
+      if (kind === "L2N") return s.replace(/^0+/, "");
+      return s.toUpperCase();
+    }
+
+    // ============ State ============
+    let state = {
+      mode: "PRACTICE",
+      direction: "N2L",
+      prompt: makePrompt("N2L"),
+      stats: { correct: 0, wrong: 0, streak: 0, best: 0 },
+      sprintActive: false,
+      timeLeft: 60,
+      sprintResult: null,
     };
-  }, []);
 
-  useEffect(() => { inputRef.current?.focus(); }, [prompt, mode, sprintActive]);
+    let timerId = null;
+    let feedbackTimeout = null;
 
-  useEffect(() => {
-    if (!sprintActive) return;
-    tickRef.current = setInterval(() => {
-      setTimeLeft((t) => {
-        if (t <= 1) {
-          clearInterval(tickRef.current);
-          setSprintActive(false);
-          setSprintResult((p) => p ?? "done");
-          return 0;
+    // ============ DOM refs ============
+    const el = {
+      app: document.getElementById("app"),
+      stage: document.getElementById("stage"),
+      result: document.getElementById("result"),
+      resultScore: document.getElementById("resultScore"),
+      resultMeta: document.getElementById("resultMeta"),
+      againBtn: document.getElementById("againBtn"),
+      startScreen: document.getElementById("startScreen"),
+      startBtn: document.getElementById("startBtn"),
+      active: document.getElementById("active"),
+      prompt: document.getElementById("prompt"),
+      input: document.getElementById("input"),
+      feedback: document.getElementById("feedback"),
+      pills: document.getElementById("pills"),
+      modeToggle: document.getElementById("modeToggle"),
+      statusReadout: document.getElementById("statusReadout"),
+      actionRow: document.getElementById("actionRow"),
+      actionBtn: document.getElementById("actionBtn"),
+    };
+
+    // ============ Build static UI ============
+    function buildPills() {
+      el.pills.innerHTML = "";
+      Object.entries(DIRECTIONS).forEach(([k, v]) => {
+        const btn = document.createElement("button");
+        btn.className = "pill";
+        btn.textContent = v;
+        btn.dataset.key = k;
+        btn.addEventListener("click", () => setDirection(k));
+        el.pills.appendChild(btn);
+      });
+    }
+
+    function buildModeToggle() {
+      el.modeToggle.innerHTML = "";
+      Object.entries(MODES).forEach(([k, v]) => {
+        const btn = document.createElement("button");
+        btn.className = "mode-btn";
+        btn.textContent = v;
+        btn.dataset.key = k;
+        btn.addEventListener("click", () => {
+          if (state.sprintActive) endSprint();
+          state.mode = k;
+          reset();
+          render();
+        });
+        el.modeToggle.appendChild(btn);
+      });
+    }
+
+    // ============ Actions ============
+    function setDirection(d) {
+      if (state.sprintActive) return;
+      state.direction = d;
+      state.prompt = makePrompt(d);
+      el.input.value = "";
+      clearFeedback();
+      render();
+    }
+
+    function nextPrompt() {
+      state.prompt = makePrompt(state.direction);
+      el.input.value = "";
+      render();
+    }
+
+    function startSprint() {
+      state.stats = { correct: 0, wrong: 0, streak: 0, best: 0 };
+      state.timeLeft = 60;
+      state.sprintResult = null;
+      state.sprintActive = true;
+      state.prompt = makePrompt(state.direction);
+      el.input.value = "";
+      clearFeedback();
+      render();
+      el.input.focus();
+
+      timerId = setInterval(() => {
+        state.timeLeft--;
+        if (state.timeLeft <= 0) {
+          state.timeLeft = 0;
+          state.sprintActive = false;
+          state.sprintResult = state.sprintResult ?? "done";
+          clearInterval(timerId);
+          timerId = null;
         }
-        return t - 1;
-      });
-    }, 1000);
-    return () => clearInterval(tickRef.current);
-  }, [sprintActive]);
+        render();
+      }, 1000);
+    }
 
-  useEffect(() => {
-    setPrompt(makePrompt(direction));
-    setInput("");
-    setFeedback(null);
-  }, [direction]);
-
-  const nextPrompt = useCallback(() => {
-    setPrompt(makePrompt(direction));
-    setInput("");
-  }, [direction]);
-
-  const startSprint = () => {
-    setStats({ correct: 0, wrong: 0, streak: 0, best: 0 });
-    setTimeLeft(60);
-    setSprintResult(null);
-    setFeedback(null);
-    setInput("");
-    setPrompt(makePrompt(direction));
-    setSprintActive(true);
-  };
-
-  const endSprint = () => {
-    setSprintActive(false);
-    clearInterval(tickRef.current);
-    setSprintResult("stopped");
-  };
-
-  const reset = () => {
-    setStats({ correct: 0, wrong: 0, streak: 0, best: 0 });
-    setFeedback(null);
-    setInput("");
-    setPrompt(makePrompt(direction));
-    setSprintResult(null);
-  };
-
-  const submit = (value) => {
-    const normalized = normalize(value, prompt.kind);
-    if (!normalized) return;
-    const ok = normalized === prompt.answer;
-
-    if (ok) {
-      setStats((s) => {
-        const streak = s.streak + 1;
-        return { correct: s.correct + 1, wrong: s.wrong, streak, best: Math.max(s.best, streak) };
-      });
-      if (mode === "PRACTICE") {
-        setFeedback({ kind: "ok" });
-        clearTimeout(fbRef.current);
-        fbRef.current = setTimeout(() => setFeedback(null), 350);
+    function endSprint() {
+      state.sprintActive = false;
+      state.sprintResult = "stopped";
+      if (timerId) {
+        clearInterval(timerId);
+        timerId = null;
       }
-      nextPrompt();
-    } else {
-      setStats((s) => ({ ...s, wrong: s.wrong + 1, streak: 0 }));
-      if (mode === "PRACTICE") {
-        setFeedback({ kind: "bad", was: prompt.answer });
-        clearTimeout(fbRef.current);
-        fbRef.current = setTimeout(() => setFeedback(null), 900);
-        setInput("");
+      render();
+    }
+
+    function reset() {
+      state.stats = { correct: 0, wrong: 0, streak: 0, best: 0 };
+      state.sprintResult = null;
+      state.prompt = makePrompt(state.direction);
+      el.input.value = "";
+      clearFeedback();
+      render();
+    }
+
+    function clearFeedback() {
+      el.feedback.innerHTML = "";
+      el.active.classList.remove("pulse-ok", "pulse-bad");
+      if (feedbackTimeout) {
+        clearTimeout(feedbackTimeout);
+        feedbackTimeout = null;
+      }
+    }
+
+    function showFeedback(kind, was) {
+      el.active.classList.remove("pulse-ok", "pulse-bad");
+      // force reflow so animation restarts
+      void el.active.offsetWidth;
+      if (kind === "ok") {
+        el.active.classList.add("pulse-ok");
+        el.feedback.innerHTML = '<span class="ok">✓</span>';
+        if (feedbackTimeout) clearTimeout(feedbackTimeout);
+        feedbackTimeout = setTimeout(() => {
+          el.feedback.innerHTML = "";
+        }, 350);
       } else {
-        nextPrompt();
+        el.active.classList.add("pulse-bad");
+        el.feedback.innerHTML = `<span class="bad">${was}</span>`;
+        if (feedbackTimeout) clearTimeout(feedbackTimeout);
+        feedbackTimeout = setTimeout(() => {
+          el.feedback.innerHTML = "";
+        }, 900);
       }
     }
-  };
 
-  const handleKey = (e) => { if (e.key === "Enter") submit(input); };
+    function submit(value) {
+      const normalized = normalize(value, state.prompt.kind);
+      if (!normalized) return;
+      const ok = normalized === state.prompt.answer;
 
-  const handleChange = (e) => {
-    const v = e.target.value;
-    setInput(v);
-    if (mode === "SPRINT" && !sprintActive) return;
-    if (prompt.kind === "N2L") {
-      const c = v.trim();
-      if (c.length >= 1 && /^[A-Za-z]$/.test(c)) submit(c);
+      if (ok) {
+        const streak = state.stats.streak + 1;
+        state.stats = {
+          correct: state.stats.correct + 1,
+          wrong: state.stats.wrong,
+          streak,
+          best: Math.max(state.stats.best, streak),
+        };
+        if (state.mode === "PRACTICE") showFeedback("ok");
+        nextPrompt();
+      } else {
+        state.stats.wrong++;
+        state.stats.streak = 0;
+        if (state.mode === "PRACTICE") {
+          showFeedback("bad", state.prompt.answer);
+          el.input.value = "";
+          render();
+        } else {
+          nextPrompt();
+        }
+      }
     }
-  };
 
-  const total = stats.correct + stats.wrong;
-  const accuracy = total === 0 ? 0 : Math.round((stats.correct / total) * 100);
-  const inputDisabled = mode === "SPRINT" && !sprintActive;
-  const showResult = mode === "SPRINT" && !sprintActive && sprintResult && total > 0;
-  const showStartScreen = mode === "SPRINT" && !sprintActive && !sprintResult;
+    // ============ Render ============
+    function render() {
+      const { mode, direction, prompt, stats, sprintActive, timeLeft, sprintResult } = state;
+      const total = stats.correct + stats.wrong;
+      const accuracy = total === 0 ? 0 : Math.round((stats.correct / total) * 100);
+      const inputDisabled = mode === "SPRINT" && !sprintActive;
+      const showResult = mode === "SPRINT" && !sprintActive && sprintResult && total > 0;
+      const showStartScreen = mode === "SPRINT" && !sprintActive && !sprintResult;
 
-  return (
-    <div className="w-full bg-stone-100 text-stone-900 flex flex-col overflow-hidden"
-      style={{
-        fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif",
-        height: vh ? `${vh}px` : "100dvh",
-      }}>
-      <style>{`
-        .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-        .pulse-ok { animation: po .35s ease-out; }
-        .pulse-bad { animation: sh .35s ease-in-out; }
-        @keyframes po { 0%{transform:scale(1)} 40%{transform:scale(1.03)} 100%{transform:scale(1)} }
-        @keyframes sh { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
-        .tick { animation: tk 1s steps(1,end) infinite; }
-        @keyframes tk { 50%{opacity:.4} }
-      `}</style>
+      // Pills
+      Array.from(el.pills.children).forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.key === direction);
+        btn.disabled = sprintActive;
+      });
 
-      {/* Top bar */}
-      <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-        <div className="flex gap-1 bg-stone-200 rounded-full p-0.5">
-          {Object.entries(MODES).map(([k, v]) => (
-            <button
-              key={k}
-              onClick={() => {
-                if (sprintActive) endSprint();
-                setMode(k);
-                reset();
-              }}
-              className={`text-xs font-medium px-3 py-1.5 rounded-full transition ${
-                mode === k ? "bg-stone-900 text-stone-50" : "text-stone-600"
-              }`}
-            >
-              {v}
-            </button>
-          ))}
-        </div>
+      // Mode toggle
+      Array.from(el.modeToggle.children).forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.key === mode);
+      });
 
-        {mode === "SPRINT" ? (
-          <div className={`mono text-lg font-bold tabular-nums ${timeLeft <= 10 && sprintActive ? "text-orange-700 tick" : "text-stone-700"}`}>
-            {String(Math.floor(timeLeft / 60))}:{String(timeLeft % 60).padStart(2, "0")}
-          </div>
-        ) : (
-          <div className="mono text-xs text-stone-500 tabular-nums">
-            {stats.correct}<span className="text-stone-400">/</span>{total}
-          </div>
-        )}
-      </div>
+      // Status readout (timer or counter)
+      if (mode === "SPRINT") {
+        const mins = Math.floor(timeLeft / 60);
+        const secs = String(timeLeft % 60).padStart(2, "0");
+        const warn = timeLeft <= 10 && sprintActive;
+        el.statusReadout.innerHTML = `<div class="timer ${warn ? "warn" : ""}">${mins}:${secs}</div>`;
+      } else {
+        el.statusReadout.innerHTML = `<div class="counter">${stats.correct}<span class="slash">/</span>${total}</div>`;
+      }
 
-      {/* Direction pills */}
-      <div className="px-4 pb-3">
-        <div className="grid grid-cols-4 gap-1.5">
-          {Object.entries(DIRECTIONS).map(([k, v]) => (
-            <button
-              key={k}
-              onClick={() => setDirection(k)}
-              disabled={sprintActive}
-              className={`text-xs font-medium py-1.5 rounded-full border transition disabled:opacity-40 ${
-                direction === k
-                  ? "bg-stone-900 text-stone-50 border-stone-900"
-                  : "bg-white text-stone-600 border-stone-300"
-              }`}
-            >
-              {v}
-            </button>
-          ))}
-        </div>
-      </div>
+      // Stage panels
+      el.result.classList.toggle("hidden", !showResult);
+      el.startScreen.classList.toggle("hidden", !showStartScreen);
+      el.active.classList.toggle("hidden", showResult || showStartScreen);
 
-      {/* Stage */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-4">
-        {showResult ? (
-          <div className="w-full max-w-sm text-center">
-            <div className="text-7xl font-black tabular-nums">{stats.correct}</div>
-            <div className="mono text-xs text-stone-500 mt-3 tabular-nums">
-              {accuracy}% · streak {stats.best}
-            </div>
-            <button
-              onClick={startSprint}
-              className="mt-10 w-full py-4 rounded-2xl bg-stone-900 text-stone-50 text-base font-semibold active:bg-orange-700 transition"
-            >
-              Again
-            </button>
-          </div>
-        ) : showStartScreen ? (
-          <button
-            onClick={startSprint}
-            className="w-full max-w-sm py-5 rounded-2xl bg-stone-900 text-stone-50 text-lg font-semibold active:bg-orange-700 transition"
-          >
-            Start
-          </button>
-        ) : (
-          <div className={`w-full text-center ${
-            feedback?.kind === "ok" ? "pulse-ok" : feedback?.kind === "bad" ? "pulse-bad" : ""
-          }`}>
-            <div className={`font-black leading-none tracking-tight select-none break-words ${
-              prompt.kind === "WORD" ? "mono text-3xl tracking-wide" : "text-8xl"
-            }`}>
-              {prompt.question}
-            </div>
+      if (showResult) {
+        el.resultScore.textContent = stats.correct;
+        el.resultMeta.textContent = `${accuracy}% · streak ${stats.best}`;
+      }
 
-            <input
-              ref={inputRef}
-              value={input}
-              onChange={handleChange}
-              onKeyDown={handleKey}
-              disabled={inputDisabled}
-              inputMode={prompt.kind === "L2N" ? "numeric" : "text"}
-              maxLength={prompt.kind === "WORD" ? 20 : prompt.kind === "L2N" ? 3 : 2}
-              className="mt-10 mono w-full max-w-xs text-center text-3xl font-bold tracking-widest bg-transparent border-b-2 border-stone-300 focus:border-stone-900 outline-none py-3 disabled:opacity-40"
-              autoComplete="off"
-              autoCapitalize="characters"
-              autoCorrect="off"
-              spellCheck={false}
-            />
+      // Active prompt
+      if (!showResult && !showStartScreen) {
+        el.prompt.textContent = prompt.question;
+        el.prompt.classList.toggle("word", prompt.kind === "WORD");
+        el.input.disabled = inputDisabled;
+        el.input.inputMode = prompt.kind === "L2N" ? "numeric" : "text";
+        el.input.maxLength = prompt.kind === "WORD" ? 20 : (prompt.kind === "L2N" ? 3 : 2);
+      }
 
-            <div className="h-6 mt-3 mono text-sm">
-              {feedback?.kind === "ok" && <span className="text-green-700">✓</span>}
-              {feedback?.kind === "bad" && <span className="text-red-700">{feedback.was}</span>}
-            </div>
-          </div>
-        )}
-      </div>
+      // Action button
+      const showAction =
+        !showResult &&
+        !showStartScreen &&
+        ((mode === "SPRINT" && sprintActive) || mode === "PRACTICE");
+      el.actionRow.classList.toggle("hidden", !showAction);
+      if (showAction) {
+        if (mode === "SPRINT" && sprintActive) {
+          el.actionBtn.textContent = "Stop";
+          el.actionBtn.onclick = endSprint;
+        } else {
+          el.actionBtn.textContent = "Reset";
+          el.actionBtn.onclick = reset;
+        }
+      }
+    }
 
-      {/* Bottom action bar */}
-      {!showResult && !showStartScreen && (
-        <div className="px-4 pb-6 pt-2 flex gap-2">
-          {prompt.kind !== "N2L" && (
-            <button
-              onClick={() => submit(input)}
-              disabled={inputDisabled || !input.trim()}
-              className="flex-1 py-4 rounded-2xl bg-stone-900 text-stone-50 text-base font-semibold active:bg-orange-700 transition disabled:opacity-30"
-            >
-              Enter
-            </button>
-          )}
-          {mode === "SPRINT" && sprintActive && (
-            <button
-              onClick={endSprint}
-              className={`${prompt.kind === "N2L" ? "flex-1" : "px-6"} py-4 rounded-2xl bg-stone-200 text-stone-600 text-sm font-medium active:bg-stone-300 transition`}
-            >
-              Stop
-            </button>
-          )}
-          {mode === "PRACTICE" && prompt.kind === "N2L" && (
-            <button
-              onClick={reset}
-              className="flex-1 py-4 rounded-2xl bg-stone-200 text-stone-600 text-sm font-medium active:bg-stone-300 transition"
-            >
-              Reset
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+    // ============ Events ============
+    el.input.addEventListener("input", (e) => {
+      const v = e.target.value;
+      if (state.mode === "SPRINT" && !state.sprintActive) return;
+      if (state.prompt.kind === "N2L") {
+        const c = v.trim();
+        if (c.length >= 1 && /^[A-Za-z]$/.test(c)) submit(c);
+      }
+    });
 
-ReactDOM.createRoot(document.getElementById("root")).render(<AlphabetTrainer />);
-</script>
+    el.input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        submit(el.input.value);
+      }
+    });
+
+    el.startBtn.addEventListener("click", startSprint);
+    el.againBtn.addEventListener("click", startSprint);
+
+    // ============ Keyboard / scroll fix backstop ============
+    // interactive-widget=resizes-content in the meta tag does the heavy lifting.
+    // This is just a backstop in case Safari tries to scroll anyway.
+    function pinTop() {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", pinTop);
+      window.visualViewport.addEventListener("scroll", pinTop);
+    }
+    window.addEventListener("scroll", pinTop, { passive: true });
+
+    // ============ Init ============
+    buildPills();
+    buildModeToggle();
+    render();
+  </script>
+
 </body>
 </html>
