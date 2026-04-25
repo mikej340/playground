@@ -431,19 +431,12 @@
     let letterStats = loadStats();
 
     function computeWeights(kind) {
-      const entries = Array.from({ length: 26 }, (_, i) => {
+      return Array.from({ length: 26 }, (_, i) => {
         const letter = String.fromCharCode(65 + i);
         const s = letterStats[kind][letter] || { a: 0, w: 0, t: 0 };
-        const correct = s.a - s.w;
         const errorRate = s.a > 0 ? s.w / s.a : 0;
-        const avgTime = correct > 0 ? s.t / correct : 0;
-        return { errorRate, avgTime, attempts: s.a };
-      });
-      const maxAvgTime = Math.max(...entries.map(e => e.avgTime), 1);
-      return entries.map(({ errorRate, avgTime, attempts }) => {
-        const confidence = Math.min(attempts / MIN_ATTEMPTS, 1);
-        const normTime = avgTime / maxAvgTime;
-        return 1 + confidence * (errorRate * 2 + normTime * 2);
+        const confidence = Math.min(s.a / MIN_ATTEMPTS, 1);
+        return 1 + confidence * errorRate * 4;
       });
     }
 
@@ -858,10 +851,19 @@
           <div class="stats-section-title">Letter → Number</div>
           <div class="stats-grid">${LETTERS.map(l => cell("L2N", l)).join("")}</div>
         </div>
+        <button class="btn-secondary" id="statsClear">Clear all stats</button>
       `;
       document.getElementById("statsClose").addEventListener("click", () => {
         state.statsOpen = false;
         render();
+      });
+      document.getElementById("statsClear").addEventListener("click", () => {
+        if (!confirm("Clear all stats and sprint bests?")) return;
+        letterStats = { N2L: emptyProfile(), L2N: emptyProfile() };
+        sprintBests = [];
+        localStorage.removeItem("alphabet-trainer-stats");
+        localStorage.removeItem("alphabet-trainer-sprints");
+        renderStats();
       });
     }
 
