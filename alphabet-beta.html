@@ -138,6 +138,31 @@
   margin-top: 12px;
 }
 
+/* Idle screen */
+.idle {
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  text-align: center;
+}
+.idle-card {
+  background: #ffffff;
+  border: 1px solid #e7e5e4;
+  border-radius: 16px;
+  padding: 20px 18px;
+}
+.idle-title {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.idle-subtitle {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #78716c;
+  line-height: 1.4;
+}
+
 /* Buttons */
 .btn-primary {
   width: 100%;
@@ -150,6 +175,16 @@
   transition: background 0.15s;
 }
 .btn-primary:active { background: #c2410c; }
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible,
+.pill:focus-visible,
+.mode-btn:focus-visible,
+.timeout-btn:focus-visible,
+.stats-btn:focus-visible,
+.stats-close:focus-visible {
+  outline: 2px solid #c2410c;
+  outline-offset: 2px;
+}
 .btn-primary.lg {
   padding: 20px;
   font-size: 18px;
@@ -368,6 +403,14 @@
         <button class="btn-primary mt-lg" id="againBtn">Again</button>
       </div>
 
+      <!-- Idle screen -->
+      <div class="idle" id="idle">
+        <div class="idle-card">
+          <div class="idle-title">Ready to train</div>
+          <div class="idle-subtitle">Pick direction and mode below, then tap Start.</div>
+        </div>
+      </div>
+
   <!-- Active prompt -->
   <div class="stage-inner" id="active">
     <div class="prompt" id="prompt">A</div>
@@ -525,6 +568,7 @@
     let state = {
       mode: "PRACTICE",
       direction: "N2L",
+      view: "IDLE", // IDLE | ACTIVE | RESULT
       prompt: makePrompt("N2L"),
       stats: { correct: 0, wrong: 0, streak: 0, best: 0 },
       sprintActive: false,
@@ -541,6 +585,29 @@
     let practiceTimerId = null;
     let promptShownAt = null;
     let feedbackTimeout = null;
+
+    function resetRoundStats() {
+      state.stats = { correct: 0, wrong: 0, streak: 0, best: 0 };
+    }
+
+    function resetPromptInput() {
+      state.prompt = makePrompt(state.direction);
+      el.input.value = "";
+      clearFeedback();
+    }
+
+    function syncView() {
+      if (state.mode === "PRACTICE") {
+        state.view = state.practiceActive ? "ACTIVE" : "IDLE";
+        return;
+      }
+      if (state.sprintActive) {
+        state.view = "ACTIVE";
+        return;
+      }
+      const total = state.stats.correct + state.stats.wrong;
+      state.view = state.sprintResult === "done" && total > 0 ? "RESULT" : "IDLE";
+    }
 
     // ============ DOM refs ============
     const el = {
@@ -563,6 +630,7 @@
       actionBtn: document.getElementById("actionBtn"),
       statsBtn: document.getElementById("statsBtn"),
       statsView: document.getElementById("statsView"),
+      idle: document.getElementById("idle"),
     };
 
     // ============ Build static UI ============
@@ -613,13 +681,12 @@
     }
 
     function startSprint() {
-      state.stats = { correct: 0, wrong: 0, streak: 0, best: 0 };
+      resetRoundStats();
       state.timeLeft = 60;
       state.sprintResult = null;
       state.sprintActive = true;
-      state.prompt = makePrompt(state.direction);
-      el.input.value = "";
-      clearFeedback();
+      resetPromptInput();
+      syncView();
       render();
       el.input.focus();
 
@@ -645,19 +712,18 @@
       }
       state.sprintResult = null;
       state.timeLeft = 60;
-      state.stats = { correct: 0, wrong: 0, streak: 0, best: 0 };
-      state.prompt = makePrompt(state.direction);
-      el.input.value = "";
-      clearFeedback();
+      resetRoundStats();
+      resetPromptInput();
+      el.input.blur();
+      syncView();
       render();
     }
 
     function startPractice() {
-      state.stats = { correct: 0, wrong: 0, streak: 0, best: 0 };
+      resetRoundStats();
       state.practiceActive = true;
-      state.prompt = makePrompt(state.direction);
-      el.input.value = "";
-      clearFeedback();
+      resetPromptInput();
+      syncView();
       render();
       el.input.focus();
       startPromptTimer();
@@ -686,14 +752,15 @@
       clearInterval(practiceTimerId);
       practiceTimerId = null;
       state.practiceActive = false;
+      el.input.blur();
+      syncView();
     }
 
     function reset() {
-      state.stats = { correct: 0, wrong: 0, streak: 0, best: 0 };
+      resetRoundStats();
       state.sprintResult = null;
-      state.prompt = makePrompt(state.direction);
-      el.input.value = "";
-      clearFeedback();
+      resetPromptInput();
+      syncView();
       render();
     }
 
@@ -764,12 +831,13 @@
 
     // ============ Render ============
     function render() {
-      const { mode, direction, prompt, stats, sprintActive, timeLeft, sprintResult, practiceActive, practiceTimeLeft } = state;
+      syncView();
+      const { mode, direction, prompt, stats, sprintActive, timeLeft, practiceActive, practiceTimeLeft, view } = state;
       const total = stats.correct + stats.wrong;
       const accuracy = total === 0 ? 0 : Math.round((stats.correct / total) * 100);
       const inputDisabled = (mode === "SPRINT" && !sprintActive) || (mode === "PRACTICE" && !practiceActive);
-      const showResult = mode === "SPRINT" && !sprintActive && sprintResult && total > 0;
-      const showStartScreen = (mode === "SPRINT" && !sprintActive && !sprintResult) || (mode === "PRACTICE" && !practiceActive);
+      const showResult = view === "RESULT";
+      const showStartScreen = view === "IDLE";
 
       // Pills
       Array.from(el.pills.children).forEach((btn) => {
@@ -804,6 +872,7 @@
 
       // Stage panels
       el.result.classList.toggle("hidden", !showResult);
+      el.idle.classList.toggle("hidden", !showStartScreen);
       el.active.classList.toggle("hidden", showResult || showStartScreen);
 
       if (showResult) {
@@ -884,7 +953,7 @@
       el.statsView.innerHTML = `
         <div class="stats-header">
           <div class="stats-title">Stats</div>
-          <button class="stats-close" id="statsClose">✕</button>
+          <button class="stats-close" id="statsClose" aria-label="Close stats">✕</button>
         </div>
         <div class="stats-section">
           <div class="stats-section-title">Sprint Bests</div>
@@ -947,6 +1016,7 @@
     });
 
     el.statsBtn.addEventListener("click", () => {
+      el.input.blur();
       state.statsOpen = true;
       renderStats();
       render();
