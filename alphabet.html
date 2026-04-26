@@ -84,6 +84,9 @@
   letter-spacing: 0.05em;
   white-space: pre-line;
 }
+.prompt-line {
+  display: block;
+}
 .input {
   margin-top: 40px;
   width: 100%;
@@ -941,17 +944,41 @@
     function fitWordPrompt() {
       if (state.prompt.kind !== "WORD") {
         el.prompt.style.fontSize = "";
+        el.prompt.textContent = state.prompt.question;
         return;
       }
       const maxSize = 30;
       const minSize = 11;
-      const availableWidth = el.active.clientWidth - 8;
-      let size = maxSize;
-      el.prompt.style.fontSize = `${size}px`;
-      while (size > minSize && el.prompt.scrollWidth > availableWidth) {
-        size -= 1;
-        el.prompt.style.fontSize = `${size}px`;
+      const availableWidth = Math.max(0, (el.prompt.clientWidth || el.active.clientWidth) - 8);
+      const lines = String(state.prompt.question || "").split("\n").filter((line) => line.length > 0);
+      const measureCanvas = document.createElement("canvas");
+      const measureCtx = measureCanvas.getContext("2d");
+      const letterSpacingEm = 0.05;
+      const fontFamily = "ui-monospace, SFMono-Regular, Menlo, monospace";
+      const fontWeight = 900;
+
+      function lineFits(lineText, sizePx) {
+        if (!measureCtx) return true;
+        measureCtx.font = `${fontWeight} ${sizePx}px ${fontFamily}`;
+        const baseWidth = measureCtx.measureText(lineText).width;
+        const spacingWidth = Math.max(0, lineText.length - 1) * (sizePx * letterSpacingEm);
+        return baseWidth + spacingWidth <= availableWidth;
       }
+
+      const lineSizes = lines.map((line) => {
+        let size = maxSize;
+        while (size > minSize && !lineFits(line, size)) size -= 1;
+        return size;
+      });
+
+      el.prompt.innerHTML = "";
+      lines.forEach((line, idx) => {
+        const span = document.createElement("span");
+        span.className = "prompt-line";
+        span.textContent = line;
+        span.style.fontSize = `${lineSizes[idx]}px`;
+        el.prompt.appendChild(span);
+      });
     }
 
     // ============ Render ============
