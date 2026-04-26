@@ -82,6 +82,7 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 30px;
   letter-spacing: 0.05em;
+  white-space: pre-line;
 }
 .input {
   margin-top: 40px;
@@ -501,11 +502,70 @@
       "garden","puzzle","shadow","rhythm","wizard","jungle","silver","canvas","breeze","velvet",
       "lantern","compass","quantum","whisper","harvest","mystery","crystal","journey","twilight","kingdom",
     ];
+    const NFL_WORDS = [
+      "Koolaid McKinstry",
+      "Chop Robinson",
+      "TJ Tampa",
+      "Spencer Rattler",
+      "Storm Duck",
+      "Bump CooperJr",
+      "Beau Brade",
+      "Ruke Orhorhoro",
+      "DJ Glaze",
+      "Bub Means",
+      "Chad OchoCinco",
+      "Dick Butkus",
+      "HaHa ClintonDix",
+      "Barkevious Mingo",
+      "Guy Whimper",
+      "DBrickashaw Ferguson",
+      "Captain Munnerlyn",
+      "BenJarvus GreenEllis",
+      "Fair Hooker",
+      "JohnDavid Booty",
+      "Earthwind Moreland",
+      "Richie Incognito",
+      "Tiki Barber",
+      "Prince Amukamara",
+      "Frostee Rucker",
+      "Tshimanga Biakabutuka",
+      "Ben Gay",
+      "Aqib Talib",
+      "Rex Grossman",
+      "Ashton Youboty",
+      "CJ AhYou",
+      "General Booty",
+      "Coy Bacon",
+      "Hercules Mataafa",
+      "Bronko Nagurski",
+      "RockYa Sin",
+      "KyuBlu Kelly",
+      "JuJu SmithSchuster",
+      "Sauce Gardner",
+      "Legedu Naanee",
+      "Tedy Bruschi",
+      "Jake Butt",
+      "Champ Bailey",
+      "Keyvantanie Coutee",
+      "Troy AumuaPolamalu",
+      "TJ Houshmandzadeh",
+      "Uche Nwaneri",
+      "Ikponmwosa Igbinosun",
+      "Ephesians Prysock",
+    ];
 
     const letterFor = (n) => String.fromCharCode(64 + n);
     const numberFor = (l) => l.toUpperCase().charCodeAt(0) - 64;
-    const randomWord = () => WORDS[Math.floor(Math.random() * WORDS.length)];
-    const wordToNumbers = (w) => w.toUpperCase().split("").map(numberFor).join(" ");
+    const randomWord = (pool) => pool[Math.floor(Math.random() * pool.length)];
+    const tokenToNumbers = (text) => text.toUpperCase().replace(/[^A-Z]/g, "").split("").map(numberFor).join(" ");
+    function wordToNumbers(w, splitNameLines = false) {
+      if (!splitNameLines) return tokenToNumbers(w);
+      const parts = w.trim().split(/\s+/).filter(Boolean);
+      if (parts.length <= 1) return tokenToNumbers(w);
+      const first = tokenToNumbers(parts[0]);
+      const surname = tokenToNumbers(parts.slice(1).join(""));
+      return `${first}\n${surname}`;
+    }
 
     // ============ Stats & weighting ============
     const MIN_ATTEMPTS = 4;
@@ -586,10 +646,15 @@
       saveStats();
     }
 
-    function makePrompt(direction) {
+    function makePrompt(direction, nflEasterEggActive = false) {
       if (direction === "WORD") {
-        const w = randomWord();
-        return { kind: "WORD", question: wordToNumbers(w), answer: w.toUpperCase() };
+        const pool = nflEasterEggActive ? NFL_WORDS : WORDS;
+        const w = randomWord(pool);
+        return {
+          kind: "WORD",
+          question: wordToNumbers(w, nflEasterEggActive),
+          answer: w.toUpperCase(),
+        };
       }
       let dir = direction;
       if (direction === "MIX") dir = Math.random() < 0.5 ? "N2L" : "L2N";
@@ -618,6 +683,8 @@
       wordTimeout: 30,
       practiceTimeLeft: 5,
       statsOpen: false,
+      nflEasterEggActive: false,
+      nflTriggerCount: 0,
     };
 
     let timerId = null;
@@ -656,7 +723,7 @@
       Object.entries(DIRECTIONS).forEach(([k, v]) => {
         const btn = document.createElement("button");
         btn.className = "pill";
-        btn.textContent = v;
+        btn.textContent = k === "WORD" ? "Word" : v;
         btn.dataset.key = k;
         btn.addEventListener("click", () => setDirection(k));
         el.pills.appendChild(btn);
@@ -684,11 +751,12 @@
     function setDirection(d) {
       if (state.sprintActive || state.practiceActive) return;
       state.direction = d;
+      if (d !== "WORD") state.nflTriggerCount = 0;
       reset();
     }
 
     function nextPrompt() {
-      state.prompt = makePrompt(state.direction);
+      state.prompt = makePrompt(state.direction, state.nflEasterEggActive);
       el.input.value = "";
       render();
       if (state.mode === "PRACTICE" && state.practiceActive) startPromptTimer();
@@ -698,7 +766,7 @@
       state.stats = { ...INITIAL_RUN_STATS };
       state.timeLeft = 60;
       state.sprintActive = true;
-      state.prompt = makePrompt(state.direction);
+      state.prompt = makePrompt(state.direction, state.nflEasterEggActive);
       el.input.value = "";
       clearFeedback();
       render();
@@ -733,7 +801,7 @@
       }
       state.timeLeft = 60;
       state.stats = { ...INITIAL_RUN_STATS };
-      state.prompt = makePrompt(state.direction);
+      state.prompt = makePrompt(state.direction, state.nflEasterEggActive);
       el.input.value = "";
       clearFeedback();
       render();
@@ -742,7 +810,7 @@
     function startPractice() {
       state.stats = { ...INITIAL_RUN_STATS };
       state.practiceActive = true;
-      state.prompt = makePrompt(state.direction);
+      state.prompt = makePrompt(state.direction, state.nflEasterEggActive);
       el.input.value = "";
       clearFeedback();
       render();
@@ -777,7 +845,7 @@
 
     function reset() {
       state.stats = { ...INITIAL_RUN_STATS };
-      state.prompt = makePrompt(state.direction);
+      state.prompt = makePrompt(state.direction, state.nflEasterEggActive);
       el.input.value = "";
       clearFeedback();
       render();
@@ -817,6 +885,28 @@
       const normalized = normalize(value, state.prompt.kind);
       if (!normalized) return;
       if (state.mode === "PRACTICE" && !state.practiceActive) return;
+      if (
+        state.mode === "PRACTICE" &&
+        state.direction === "WORD" &&
+        !state.nflEasterEggActive
+      ) {
+        if (normalized === "NFL") {
+          state.nflTriggerCount++;
+          if (state.nflTriggerCount >= 3) {
+            state.nflEasterEggActive = true;
+            state.nflTriggerCount = 0;
+            stopPractice();
+            state.stats = { ...INITIAL_RUN_STATS };
+            state.prompt = makePrompt(state.direction, state.nflEasterEggActive);
+            el.input.value = "";
+            clearFeedback();
+            render();
+            return;
+          }
+        } else {
+          state.nflTriggerCount = 0;
+        }
+      }
       const ok = normalized === state.prompt.answer;
       const elapsedMs = promptShownAt ? Date.now() - promptShownAt : 0;
       const letter = state.prompt.kind === "N2L" ? state.prompt.answer : state.prompt.question;
@@ -848,6 +938,22 @@
       }
     }
 
+    function fitWordPrompt() {
+      if (state.prompt.kind !== "WORD") {
+        el.prompt.style.fontSize = "";
+        return;
+      }
+      const maxSize = 30;
+      const minSize = 11;
+      const availableWidth = el.active.clientWidth - 8;
+      let size = maxSize;
+      el.prompt.style.fontSize = `${size}px`;
+      while (size > minSize && el.prompt.scrollWidth > availableWidth) {
+        size -= 1;
+        el.prompt.style.fontSize = `${size}px`;
+      }
+    }
+
     // ============ Render ============
     function render() {
       const { mode, direction, prompt, sprintActive, timeLeft, practiceActive, practiceTimeLeft } = state;
@@ -858,6 +964,7 @@
       Array.from(el.pills.children).forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.key === direction);
         btn.disabled = sprintActive || practiceActive;
+        if (btn.dataset.key === "WORD") btn.textContent = state.nflEasterEggActive ? "🏈" : "Word";
       });
 
       // Mode toggle
@@ -919,8 +1026,9 @@
         el.input.disabled = inputDisabled;
         const newInputMode = prompt.kind === "L2N" ? "numeric" : "text";
         if (el.input.inputMode !== newInputMode) el.input.inputMode = newInputMode;
-        const newMaxLength = prompt.kind === "WORD" ? 20 : (prompt.kind === "L2N" ? 3 : 2);
+        const newMaxLength = prompt.kind === "WORD" ? 40 : (prompt.kind === "L2N" ? 3 : 2);
         if (el.input.maxLength !== newMaxLength) el.input.maxLength = newMaxLength;
+        fitWordPrompt();
       }
 
       // Timeout toggle — practice idle only
@@ -1066,6 +1174,7 @@
       window.visualViewport.addEventListener("scroll", pinTop);
     }
     window.addEventListener("scroll", pinTop, { passive: true });
+    window.addEventListener("resize", fitWordPrompt);
 
     // ============ Init ============
     buildPills();
