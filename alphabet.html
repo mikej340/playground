@@ -554,12 +554,24 @@
       } catch { return {}; }
     })();
 
+    let sprintSummaries = (() => {
+      try {
+        const raw = JSON.parse(localStorage.getItem("alphabet-trainer-sprint-summaries") || "{}");
+        return Array.isArray(raw) ? {} : raw;
+      } catch { return {}; }
+    })();
+
     function saveSprintBest(direction, correct, wrong) {
       const cur = sprintBests[direction];
       if (!cur || correct > cur.c || (correct === cur.c && wrong < cur.w)) {
         sprintBests[direction] = { c: correct, w: wrong };
         localStorage.setItem("alphabet-trainer-sprints", JSON.stringify(sprintBests));
       }
+    }
+
+    function saveSprintSummary(mode, direction, summary) {
+      sprintSummaries[`${mode}:${direction}`] = summary;
+      localStorage.setItem("alphabet-trainer-sprint-summaries", JSON.stringify(sprintSummaries));
     }
 
     function recordAttempt(kind, letter, correct, elapsedMs) {
@@ -599,7 +611,6 @@
       stats: { correct: 0, wrong: 0, streak: 0, best: 0 },
       sprintActive: false,
       timeLeft: 60,
-      lastAttempt: null,
       practiceActive: false,
       practiceTimeout: 5,
       wordTimeout: 30,
@@ -662,7 +673,7 @@
           if (state.sprintActive) endSprint();
           if (state.practiceActive) stopPractice();
           state.mode = k;
-          reset(true);
+          reset();
         });
         el.modeToggle.appendChild(btn);
       });
@@ -685,7 +696,6 @@
     function startSprint() {
       state.stats = { correct: 0, wrong: 0, streak: 0, best: 0 };
       state.timeLeft = 60;
-      state.lastAttempt = null;
       state.sprintActive = true;
       state.prompt = makePrompt(state.direction);
       el.input.value = "";
@@ -700,13 +710,12 @@
           state.sprintActive = false;
           const total = state.stats.correct + state.stats.wrong;
           const accuracy = total === 0 ? 0 : Math.round((state.stats.correct / total) * 100);
-          state.lastAttempt = {
-            direction: state.direction,
+          saveSprintSummary("SPRINT", state.direction, {
             correct: state.stats.correct,
             wrong: state.stats.wrong,
             best: state.stats.best,
             accuracy,
-          };
+          });
           saveSprintBest(state.direction, state.stats.correct, state.stats.wrong);
           clearInterval(timerId);
           timerId = null;
@@ -721,7 +730,6 @@
         clearInterval(timerId);
         timerId = null;
       }
-      state.lastAttempt = null;
       state.timeLeft = 60;
       state.stats = { correct: 0, wrong: 0, streak: 0, best: 0 };
       state.prompt = makePrompt(state.direction);
@@ -766,9 +774,8 @@
       state.practiceActive = false;
     }
 
-    function reset(preserveLastAttempt = false) {
+    function reset() {
       state.stats = { correct: 0, wrong: 0, streak: 0, best: 0 };
-      if (!preserveLastAttempt) state.lastAttempt = null;
       state.prompt = makePrompt(state.direction);
       el.input.value = "";
       clearFeedback();
@@ -894,8 +901,8 @@
           el.idleBestMeta.textContent = "";
         }
 
-        const last = state.lastAttempt;
-        const showLastAttempt = Boolean(last && last.direction === direction);
+        const last = sprintSummaries[`${mode}:${direction}`] || sprintSummaries[`SPRINT:${direction}`];
+        const showLastAttempt = Boolean(last);
         el.lastAttempt.classList.toggle("hidden", !showLastAttempt);
         if (showLastAttempt) {
           el.lastAttemptLine.textContent = `${last.correct} correct · ${last.wrong} wrong · ${last.accuracy}% · best streak ${last.best}`;
@@ -1001,8 +1008,10 @@
         if (!confirm("Clear all stats and sprint bests?")) return;
         letterStats = { N2L: emptyProfile(), L2N: emptyProfile() };
         sprintBests = {};
+        sprintSummaries = {};
         localStorage.removeItem("alphabet-trainer-stats");
         localStorage.removeItem("alphabet-trainer-sprints");
+        localStorage.removeItem("alphabet-trainer-sprint-summaries");
         renderStats();
       });
     }
