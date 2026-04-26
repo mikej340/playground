@@ -119,23 +119,76 @@
 }
 .prompt-timer.warn { color: #c2410c; }
 
-/* Result screen */
-.result {
+/* Idle card */
+.idle-card {
   width: 100%;
   max-width: 384px;
-  text-align: center;
   margin: 0 auto;
+  border: 1px solid #d6d3d1;
+  border-radius: 24px;
+  background: #fafaf9;
+  overflow: hidden;
 }
-.result-score {
-  font-size: 72px;
+.idle-head {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  padding: 18px 14px;
+}
+.idle-col { text-align: center; }
+.idle-label {
+  font-size: 13px;
+  color: #78716c;
+  margin-bottom: 8px;
+}
+.idle-pill {
+  background: #f1f0ef;
+  border-radius: 14px;
+  padding: 10px 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+.idle-divider {
+  height: 1px;
+  background: #e7e5e4;
+}
+.idle-main {
+  padding: 18px 16px 20px;
+  text-align: center;
+}
+.idle-sub {
+  font-size: 13px;
+  color: #78716c;
+}
+.idle-score {
+  margin-top: 8px;
+  font-size: 82px;
   font-weight: 900;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
-.result-meta {
+.idle-meta {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
   color: #78716c;
+  margin-top: 6px;
+}
+.last-attempt {
   margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed #d6d3d1;
+}
+.last-attempt-title {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #78716c;
+  margin-bottom: 4px;
+}
+.last-attempt-line {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: #57534e;
 }
 
 /* Buttons */
@@ -361,11 +414,28 @@
 
     <!-- Stage -->
     <div class="stage" id="stage">
-      <!-- Result screen -->
-      <div class="result hidden" id="result">
-        <div class="result-score" id="resultScore">0</div>
-        <div class="result-meta" id="resultMeta">0% · streak 0</div>
-        <button class="btn-primary mt-lg" id="againBtn">Again</button>
+      <!-- Idle card -->
+      <div class="idle-card hidden" id="idleCard">
+        <div class="idle-head">
+          <div class="idle-col">
+            <div class="idle-label">Mode</div>
+            <div class="idle-pill" id="idleDirection">N→L</div>
+          </div>
+          <div class="idle-col">
+            <div class="idle-label">Session Type</div>
+            <div class="idle-pill" id="idleSession">Practice</div>
+          </div>
+        </div>
+        <div class="idle-divider"></div>
+        <div class="idle-main">
+          <div class="idle-sub">Best 60s Sprint</div>
+          <div class="idle-score" id="idleBest">—</div>
+          <div class="idle-meta hidden" id="idleBestMeta"></div>
+          <div class="last-attempt hidden" id="lastAttempt">
+            <div class="last-attempt-title">Last Attempt</div>
+            <div class="last-attempt-line" id="lastAttemptLine"></div>
+          </div>
+        </div>
       </div>
 
   <!-- Active prompt -->
@@ -529,7 +599,7 @@
       stats: { correct: 0, wrong: 0, streak: 0, best: 0 },
       sprintActive: false,
       timeLeft: 60,
-      sprintResult: null,
+      lastAttempt: null,
       practiceActive: false,
       practiceTimeout: 5,
       wordTimeout: 30,
@@ -546,10 +616,13 @@
     const el = {
       app: document.getElementById("app"),
       stage: document.getElementById("stage"),
-      result: document.getElementById("result"),
-      resultScore: document.getElementById("resultScore"),
-      resultMeta: document.getElementById("resultMeta"),
-      againBtn: document.getElementById("againBtn"),
+      idleCard: document.getElementById("idleCard"),
+      idleDirection: document.getElementById("idleDirection"),
+      idleSession: document.getElementById("idleSession"),
+      idleBest: document.getElementById("idleBest"),
+      idleBestMeta: document.getElementById("idleBestMeta"),
+      lastAttempt: document.getElementById("lastAttempt"),
+      lastAttemptLine: document.getElementById("lastAttemptLine"),
       active: document.getElementById("active"),
       prompt: document.getElementById("prompt"),
       input: document.getElementById("input"),
@@ -589,7 +662,7 @@
           if (state.sprintActive) endSprint();
           if (state.practiceActive) stopPractice();
           state.mode = k;
-          reset();
+          reset(true);
         });
         el.modeToggle.appendChild(btn);
       });
@@ -599,10 +672,7 @@
     function setDirection(d) {
       if (state.sprintActive || state.practiceActive) return;
       state.direction = d;
-      state.prompt = makePrompt(d);
-      el.input.value = "";
-      clearFeedback();
-      render();
+      reset();
     }
 
     function nextPrompt() {
@@ -615,7 +685,7 @@
     function startSprint() {
       state.stats = { correct: 0, wrong: 0, streak: 0, best: 0 };
       state.timeLeft = 60;
-      state.sprintResult = null;
+      state.lastAttempt = null;
       state.sprintActive = true;
       state.prompt = makePrompt(state.direction);
       el.input.value = "";
@@ -628,7 +698,15 @@
         if (state.timeLeft <= 0) {
           state.timeLeft = 0;
           state.sprintActive = false;
-          state.sprintResult = state.sprintResult ?? "done";
+          const total = state.stats.correct + state.stats.wrong;
+          const accuracy = total === 0 ? 0 : Math.round((state.stats.correct / total) * 100);
+          state.lastAttempt = {
+            direction: state.direction,
+            correct: state.stats.correct,
+            wrong: state.stats.wrong,
+            best: state.stats.best,
+            accuracy,
+          };
           saveSprintBest(state.direction, state.stats.correct, state.stats.wrong);
           clearInterval(timerId);
           timerId = null;
@@ -643,7 +721,7 @@
         clearInterval(timerId);
         timerId = null;
       }
-      state.sprintResult = null;
+      state.lastAttempt = null;
       state.timeLeft = 60;
       state.stats = { correct: 0, wrong: 0, streak: 0, best: 0 };
       state.prompt = makePrompt(state.direction);
@@ -688,9 +766,9 @@
       state.practiceActive = false;
     }
 
-    function reset() {
+    function reset(preserveLastAttempt = false) {
       state.stats = { correct: 0, wrong: 0, streak: 0, best: 0 };
-      state.sprintResult = null;
+      if (!preserveLastAttempt) state.lastAttempt = null;
       state.prompt = makePrompt(state.direction);
       el.input.value = "";
       clearFeedback();
@@ -764,12 +842,9 @@
 
     // ============ Render ============
     function render() {
-      const { mode, direction, prompt, stats, sprintActive, timeLeft, sprintResult, practiceActive, practiceTimeLeft } = state;
-      const total = stats.correct + stats.wrong;
-      const accuracy = total === 0 ? 0 : Math.round((stats.correct / total) * 100);
+      const { mode, direction, prompt, sprintActive, timeLeft, practiceActive, practiceTimeLeft } = state;
       const inputDisabled = (mode === "SPRINT" && !sprintActive) || (mode === "PRACTICE" && !practiceActive);
-      const showResult = mode === "SPRINT" && !sprintActive && sprintResult && total > 0;
-      const showStartScreen = (mode === "SPRINT" && !sprintActive && !sprintResult) || (mode === "PRACTICE" && !practiceActive);
+      const showStartScreen = (mode === "SPRINT" && !sprintActive) || (mode === "PRACTICE" && !practiceActive);
 
       // Pills
       Array.from(el.pills.children).forEach((btn) => {
@@ -803,16 +878,34 @@
       }
 
       // Stage panels
-      el.result.classList.toggle("hidden", !showResult);
-      el.active.classList.toggle("hidden", showResult || showStartScreen);
+      el.idleCard.classList.toggle("hidden", !showStartScreen);
+      el.active.classList.toggle("hidden", showStartScreen);
 
-      if (showResult) {
-        el.resultScore.textContent = stats.correct;
-        el.resultMeta.textContent = `${accuracy}% · streak ${stats.best}`;
+      if (showStartScreen) {
+        const best = sprintBests[direction];
+        el.idleDirection.textContent = DIRECTIONS[direction];
+        el.idleSession.textContent = MODES[mode];
+        el.idleBest.textContent = best ? String(best.c) : "—";
+        if (best) {
+          el.idleBestMeta.classList.remove("hidden");
+          el.idleBestMeta.textContent = best.w === 0 ? "all correct" : `${best.w} incorrect in best run`;
+        } else {
+          el.idleBestMeta.classList.add("hidden");
+          el.idleBestMeta.textContent = "";
+        }
+
+        const last = state.lastAttempt;
+        const showLastAttempt = Boolean(last && last.direction === direction);
+        el.lastAttempt.classList.toggle("hidden", !showLastAttempt);
+        if (showLastAttempt) {
+          el.lastAttemptLine.textContent = `${last.correct} correct · ${last.wrong} wrong · ${last.accuracy}% · best streak ${last.best}`;
+        } else {
+          el.lastAttemptLine.textContent = "";
+        }
       }
 
       // Active prompt
-      if (!showResult && !showStartScreen) {
+      if (!showStartScreen) {
         el.prompt.textContent = prompt.question;
         el.prompt.classList.toggle("word", prompt.kind === "WORD");
         el.input.disabled = inputDisabled;
@@ -934,8 +1027,6 @@
         submit(el.input.value);
       }
     });
-
-    el.againBtn.addEventListener("click", startSprint);
 
     el.timeoutRow.addEventListener("click", (e) => {
       const btn = e.target.closest("[data-t]");
