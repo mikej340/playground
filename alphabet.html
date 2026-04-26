@@ -495,6 +495,7 @@
     };
     const INITIAL_RUN_STATS = { correct: 0, wrong: 0, streak: 0, best: 0 };
     const TIMEOUT_OPTIONS = { DEFAULT: [5, 10, 20], WORD: [10, 30, 60] };
+    const NFL_EASTER_EGG_PHRASE = "DRAXX THEM SKLOUNST";
 
     const WORDS = [
       "cat","dog","run","sky","owl","tea","map","pen","jar","fox",
@@ -687,7 +688,6 @@
       practiceTimeLeft: 5,
       statsOpen: false,
       nflEasterEggActive: false,
-      nflTriggerCount: 0,
     };
 
     let timerId = null;
@@ -720,13 +720,18 @@
       statsView: document.getElementById("statsView"),
     };
 
+    function getDirectionLabel(direction) {
+      if (direction === "WORD" && state.nflEasterEggActive) return "🏈🏈🏈";
+      return DIRECTIONS[direction];
+    }
+
     // ============ Build static UI ============
     function buildPills() {
       el.pills.innerHTML = "";
       Object.entries(DIRECTIONS).forEach(([k, v]) => {
         const btn = document.createElement("button");
         btn.className = "pill";
-        btn.textContent = k === "WORD" ? "Word" : v;
+        btn.textContent = getDirectionLabel(k);
         btn.dataset.key = k;
         btn.addEventListener("click", () => setDirection(k));
         el.pills.appendChild(btn);
@@ -754,7 +759,6 @@
     function setDirection(d) {
       if (state.sprintActive || state.practiceActive) return;
       state.direction = d;
-      if (d !== "WORD") state.nflTriggerCount = 0;
       reset();
     }
 
@@ -875,6 +879,10 @@
           el.feedback.innerHTML = "";
         }, 350);
       } else {
+        if (kind === "hint") {
+          el.feedback.textContent = "🤨";
+          return;
+        }
         el.active.classList.add("pulse-bad");
         el.feedback.innerHTML = `<span class="bad">${was}</span>`;
         if (feedbackTimeout) clearTimeout(feedbackTimeout);
@@ -893,22 +901,24 @@
         state.direction === "WORD" &&
         !state.nflEasterEggActive
       ) {
-        if (normalized === "NFL") {
-          state.nflTriggerCount++;
-          if (state.nflTriggerCount >= 3) {
-            state.nflEasterEggActive = true;
-            state.nflTriggerCount = 0;
-            stopPractice();
-            state.stats = { ...INITIAL_RUN_STATS };
-            state.prompt = makePrompt(state.direction, state.nflEasterEggActive);
-            el.input.value = "";
-            clearFeedback();
-            render();
-            return;
-          }
-        } else {
-          state.nflTriggerCount = 0;
+        const matchesPhrasePrefix = NFL_EASTER_EGG_PHRASE.startsWith(normalized);
+        if (normalized === NFL_EASTER_EGG_PHRASE) {
+          state.nflEasterEggActive = true;
+          stopPractice();
+          state.stats = { ...INITIAL_RUN_STATS };
+          state.prompt = makePrompt(state.direction, state.nflEasterEggActive);
+          el.input.value = "";
+          clearFeedback();
+          render();
+          return;
         }
+        if (matchesPhrasePrefix) {
+          if (normalized.length >= state.prompt.answer.length) {
+            showFeedback("hint");
+          }
+          return;
+        }
+        clearFeedback();
       }
       const ok = normalized === state.prompt.answer;
       const elapsedMs = promptShownAt ? Date.now() - promptShownAt : 0;
@@ -991,7 +1001,7 @@
       Array.from(el.pills.children).forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.key === direction);
         btn.disabled = sprintActive || practiceActive;
-        if (btn.dataset.key === "WORD") btn.textContent = state.nflEasterEggActive ? "🏈" : "Word";
+        if (btn.dataset.key === "WORD") btn.textContent = getDirectionLabel("WORD");
       });
 
       // Mode toggle
@@ -1025,7 +1035,7 @@
 
       if (showStartScreen) {
         const best = sprintBests[direction];
-        el.idleDirection.textContent = DIRECTIONS[direction];
+        el.idleDirection.textContent = getDirectionLabel(direction);
         el.idleSession.textContent = MODES[mode];
         el.idleBest.textContent = best ? String(best.c) : "—";
         if (best) {
@@ -1162,7 +1172,7 @@
         if (c.length >= 1 && /^[A-Za-z]$/.test(c)) submit(c);
       } else if (state.prompt.kind === "L2N" || state.prompt.kind === "WORD") {
         const c = v.trim();
-        if (c.length === state.prompt.answer.length) submit(c);
+        if (c.length >= state.prompt.answer.length) submit(c);
       }
     });
 
