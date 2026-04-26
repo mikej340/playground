@@ -273,6 +273,7 @@
   background: #1c1917;
   color: #fafaf9;
 }
+.mode-btn:disabled { opacity: 0.4; }
 .timer {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 18px;
@@ -943,7 +944,7 @@
           el.actionBtn.onclick = () => { if (state.mode === "SPRINT") startSprint(); else startPractice(); };
         } else {
           el.actionBtn.textContent = "Stop";
-          el.actionBtn.className = "btn-secondary";
+          el.actionBtn.className = "btn-primary";
           el.actionBtn.onclick = mode === "SPRINT" ? endSprint : () => { stopPractice(); render(); };
         }
       }
