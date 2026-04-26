@@ -494,7 +494,7 @@
       SPRINT_SUMMARIES: "alphabet-trainer-sprint-summaries",
     };
     const INITIAL_RUN_STATS = { correct: 0, wrong: 0, streak: 0, best: 0 };
-    const TIMEOUT_OPTIONS = { DEFAULT: [5, 10, 20], WORD: [10, 30, 60] };
+    const TIMEOUT_OPTIONS = { DEFAULT: [5, 10, 20], WORD: [10, 30, 60], WORD_EASTER_EGG: [60, 120, 180] };
     const NFL_EASTER_EGG_PHRASE = "DRAXX THEM SKLOUNST";
 
     const WORDS = [
@@ -684,7 +684,7 @@
       timeLeft: 60,
       practiceActive: false,
       practiceTimeout: 5,
-      wordTimeout: 30,
+      wordTimeout: 60,
       practiceTimeLeft: 5,
       statsOpen: false,
       nflEasterEggActive: false,
@@ -723,6 +723,11 @@
     function getDirectionLabel(direction) {
       if (direction === "WORD" && state.nflEasterEggActive) return "🏈🏈🏈";
       return DIRECTIONS[direction];
+    }
+
+    function formatTimeoutLabel(seconds) {
+      if (seconds % 60 === 0) return `${seconds / 60}m`;
+      return `${seconds}s`;
     }
 
     // ============ Build static UI ============
@@ -904,6 +909,7 @@
         const matchesPhrasePrefix = NFL_EASTER_EGG_PHRASE.startsWith(normalized);
         if (normalized === NFL_EASTER_EGG_PHRASE) {
           state.nflEasterEggActive = true;
+          state.wordTimeout = Math.max(...TIMEOUT_OPTIONS.WORD_EASTER_EGG);
           stopPractice();
           state.stats = { ...INITIAL_RUN_STATS };
           state.prompt = makePrompt(state.direction, state.nflEasterEggActive);
@@ -1022,7 +1028,7 @@
         el.promptTimer.className = `prompt-timer${warn ? " warn" : ""}`;
       } else if (mode === "PRACTICE" && practiceActive) {
         const warnAt = (direction === "WORD" ? state.wordTimeout : state.practiceTimeout) > 10 ? 5 : 2;
-        el.promptTimer.textContent = `${practiceTimeLeft}s`;
+        el.promptTimer.textContent = formatTimeoutLabel(practiceTimeLeft);
         el.promptTimer.className = `prompt-timer${practiceTimeLeft <= warnAt ? " warn" : ""}`;
       } else {
         el.promptTimer.textContent = "";
@@ -1072,10 +1078,12 @@
       const showTimeout = mode === "PRACTICE" && !practiceActive;
       el.timeoutRow.classList.toggle("hidden", !showTimeout);
       if (showTimeout) {
-        const opts = direction === "WORD" ? TIMEOUT_OPTIONS.WORD : TIMEOUT_OPTIONS.DEFAULT;
+        const opts = direction === "WORD"
+          ? (state.nflEasterEggActive ? TIMEOUT_OPTIONS.WORD_EASTER_EGG : TIMEOUT_OPTIONS.WORD)
+          : TIMEOUT_OPTIONS.DEFAULT;
         const active = direction === "WORD" ? state.wordTimeout : state.practiceTimeout;
         el.timeoutRow.innerHTML = opts.map(t =>
-          `<button class="timeout-btn${active === t ? " active" : ""}" data-t="${t}">${t === 60 ? "1m" : t + "s"}</button>`
+          `<button class="timeout-btn${active === t ? " active" : ""}" data-t="${t}">${formatTimeoutLabel(t)}</button>`
         ).join("");
       }
 
