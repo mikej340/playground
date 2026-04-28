@@ -642,16 +642,26 @@
       });
     }
     
+    const pickQueues = { N2L: [], L2N: [] };
 
-    function weightedPickN(kind) {
+    function refillQueue(kind) {
       const weights = computeWeights(kind);
-      const total = weights.reduce((a, b) => a + b, 0);
-      let r = Math.random() * total;
-      for (let i = 0; i < weights.length; i++) {
-        r -= weights[i];
-        if (r <= 0) return i + 1;
+      const queue = [];
+      weights.forEach((w, i) => {
+        const slots = Math.max(1, Math.round(w));
+        for (let s = 0; s < slots; s++) queue.push(i + 1);
+      });
+      // Fisher-Yates shuffle
+      for (let i = queue.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [queue[i], queue[j]] = [queue[j], queue[i]];
       }
-      return 26;
+      pickQueues[kind] = queue;
+    }
+    
+    function weightedPickN(kind) {
+      if (pickQueues[kind].length === 0) refillQueue(kind);
+      return pickQueues[kind].pop();
     }
 
     let sprintBests = loadStoredObject(STORAGE_KEYS.SPRINT_BESTS);
@@ -674,11 +684,15 @@
       if (kind === "WORD") return;
       const s = letterStats[kind][letter] || { a: 0, w: 0, t: 0 };
       s.a++;
-      if (!correct) s.w++;
+      if (!correct) {
+        s.w++;
+        pickQueues[kind] = []; // force refill with updated weights next pick
+      }
       if (correct) s.t += elapsedMs;
       letterStats[kind][letter] = s;
       saveStats();
     }
+
 
     function makePrompt(direction, nflEasterEggActive = false) {
       if (direction === "WORD") {
