@@ -105,6 +105,25 @@
 }
 .input:focus { border-bottom-color: #1c1917; }
 .input:disabled { opacity: 0.4; }
+.choices {
+  margin-top: 22px;
+  width: 100%;
+  max-width: 380px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.choice-btn {
+  border: 1px solid #d6d3d1;
+  border-radius: 14px;
+  padding: 14px 6px;
+  background: #fff;
+  color: #1c1917;
+  font-size: 24px;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.choice-btn:active { background: #f5f5f4; }
 .feedback {
   height: 36px;
   margin-top: 12px;
@@ -340,6 +359,27 @@
   color: #fafaf9;
   border-color: #1c1917;
 }
+.practice-input-row {
+  display: flex;
+  gap: 6px;
+  padding-bottom: 6px;
+}
+.practice-input-btn {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 0;
+  border-radius: 9999px;
+  border: 1px solid #d6d3d1;
+  background: white;
+  color: #57534e;
+  transition: all 0.15s;
+}
+.practice-input-btn.active {
+  background: #1c1917;
+  color: #fafaf9;
+  border-color: #1c1917;
+}
 
 /* Stats view */
 .stats-btn {
@@ -466,6 +506,7 @@
     />
     <div class="feedback" id="feedback"></div>
     <div class="prompt-timer" id="promptTimer"></div>
+    <div class="choices hidden" id="choices"></div>
   </div>
 </div>
 
@@ -473,6 +514,7 @@
 <div class="controls">
   <!-- Timeout toggle (practice mode, non-word) -->
   <div class="timeout-row hidden" id="timeoutRow"></div>
+  <div class="practice-input-row hidden" id="practiceInputRow"></div>
 
   <!-- Action button (Start / Stop) — above pills -->
   <div class="action-row hidden" id="actionRow">
@@ -717,6 +759,25 @@
       return s.toUpperCase();
     }
 
+    function shuffle(list) {
+      const copy = [...list];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    function buildPracticeChoices(prompt) {
+      if (!prompt || prompt.kind === "WORD") return [];
+      const correct = String(prompt.answer);
+      const pool = prompt.kind === "N2L"
+        ? Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i))
+        : Array.from({ length: 26 }, (_, i) => String(i + 1));
+      const wrong = shuffle(pool.filter((value) => value !== correct)).slice(0, 3);
+      return shuffle([correct, ...wrong]);
+    }
+
     // ============ State ============
     let state = {
       mode: "PRACTICE",
@@ -729,6 +790,8 @@
       practiceTimeout: 5,
       wordTimeout: 60,
       practiceTimeLeft: 5,
+      practiceAnswerMode: "TYPE",
+      promptChoices: [],
       statsOpen: false,
       nflEasterEggActive: false,
       statsFrequencyView: { N2L: false, L2N: false },
@@ -758,10 +821,12 @@
       pills: document.getElementById("pills"),
       modeToggle: document.getElementById("modeToggle"),
       timeoutRow: document.getElementById("timeoutRow"),
+      practiceInputRow: document.getElementById("practiceInputRow"),
       actionRow: document.getElementById("actionRow"),
       actionBtn: document.getElementById("actionBtn"),
       statsBtn: document.getElementById("statsBtn"),
       statsView: document.getElementById("statsView"),
+      choices: document.getElementById("choices"),
     };
 
     function getDirectionLabel(direction) {
@@ -813,6 +878,7 @@
 
     function nextPrompt() {
       state.prompt = makePrompt(state.direction, state.nflEasterEggActive);
+      state.promptChoices = buildPracticeChoices(state.prompt);
       el.input.value = "";
       render();
       if (state.mode === "PRACTICE" && state.practiceActive) startPromptTimer();
@@ -823,6 +889,7 @@
       state.timeLeft = 60;
       state.sprintActive = true;
       state.prompt = makePrompt(state.direction, state.nflEasterEggActive);
+      state.promptChoices = buildPracticeChoices(state.prompt);
       el.input.value = "";
       clearFeedback();
       render();
@@ -858,6 +925,7 @@
       state.timeLeft = 60;
       state.stats = { ...INITIAL_RUN_STATS };
       state.prompt = makePrompt(state.direction, state.nflEasterEggActive);
+      state.promptChoices = buildPracticeChoices(state.prompt);
       el.input.value = "";
       clearFeedback();
       render();
@@ -867,10 +935,11 @@
       state.stats = { ...INITIAL_RUN_STATS };
       state.practiceActive = true;
       state.prompt = makePrompt(state.direction, state.nflEasterEggActive);
+      state.promptChoices = buildPracticeChoices(state.prompt);
       el.input.value = "";
       clearFeedback();
       render();
-      el.input.focus();
+      if (state.practiceAnswerMode === "TYPE" || state.direction === "WORD") el.input.focus();
       startPromptTimer();
     }
 
@@ -902,6 +971,7 @@
     function reset() {
       state.stats = { ...INITIAL_RUN_STATS };
       state.prompt = makePrompt(state.direction, state.nflEasterEggActive);
+      state.promptChoices = buildPracticeChoices(state.prompt);
       el.input.value = "";
       clearFeedback();
       render();
@@ -957,6 +1027,7 @@
           stopPractice();
           state.stats = { ...INITIAL_RUN_STATS };
           state.prompt = makePrompt(state.direction, state.nflEasterEggActive);
+          state.promptChoices = buildPracticeChoices(state.prompt);
           el.input.value = "";
           clearFeedback();
           render();
@@ -1044,7 +1115,8 @@
     // ============ Render ============
     function render() {
       const { mode, direction, prompt, sprintActive, timeLeft, practiceActive, practiceTimeLeft } = state;
-      const inputDisabled = (mode === "SPRINT" && !sprintActive) || (mode === "PRACTICE" && !practiceActive);
+      const pickModeActive = mode === "PRACTICE" && state.practiceAnswerMode === "PICK" && prompt.kind !== "WORD";
+      const inputDisabled = (mode === "SPRINT" && !sprintActive) || (mode === "PRACTICE" && !practiceActive) || pickModeActive;
       const showStartScreen = (mode === "SPRINT" && !sprintActive) || (mode === "PRACTICE" && !practiceActive);
 
       // Pills
@@ -1111,11 +1183,25 @@
         el.prompt.textContent = prompt.question;
         el.prompt.classList.toggle("word", prompt.kind === "WORD");
         el.input.disabled = inputDisabled;
+        el.input.classList.toggle("hidden", pickModeActive);
         const newInputMode = prompt.kind === "L2N" ? "numeric" : "text";
         if (el.input.inputMode !== newInputMode) el.input.inputMode = newInputMode;
         const newMaxLength = prompt.kind === "WORD" ? 40 : (prompt.kind === "L2N" ? 3 : 2);
         if (el.input.maxLength !== newMaxLength) el.input.maxLength = newMaxLength;
+        const showChoices = pickModeActive && practiceActive;
+        el.choices.classList.toggle("hidden", !showChoices);
+        if (showChoices) {
+          el.choices.innerHTML = state.promptChoices.map((choice) =>
+            `<button class="choice-btn" data-choice="${choice}">${choice}</button>`
+          ).join("");
+        } else {
+          el.choices.innerHTML = "";
+        }
         fitWordPrompt();
+      } else {
+        el.input.classList.remove("hidden");
+        el.choices.classList.add("hidden");
+        el.choices.innerHTML = "";
       }
 
       // Timeout toggle — practice idle only
@@ -1129,6 +1215,15 @@
         el.timeoutRow.innerHTML = opts.map(t =>
           `<button class="timeout-btn${active === t ? " active" : ""}" data-t="${t}">${formatTimeoutLabel(t)}</button>`
         ).join("");
+      }
+
+      const showPracticeInput = mode === "PRACTICE" && direction !== "WORD" && !practiceActive;
+      el.practiceInputRow.classList.toggle("hidden", !showPracticeInput);
+      if (showPracticeInput) {
+        el.practiceInputRow.innerHTML = `
+          <button class="practice-input-btn${state.practiceAnswerMode === "TYPE" ? " active" : ""}" data-answer-mode="TYPE">Keyboard</button>
+          <button class="practice-input-btn${state.practiceAnswerMode === "PICK" ? " active" : ""}" data-answer-mode="PICK">Pick 4</button>
+        `;
       }
 
       // Action button — Start when idle, Stop during sprint or active practice
@@ -1244,6 +1339,7 @@
       const v = e.target.value;
       if (state.mode === "SPRINT" && !state.sprintActive) return;
       if (state.mode === "PRACTICE" && !state.practiceActive) return;
+      if (state.mode === "PRACTICE" && state.practiceAnswerMode === "PICK" && state.prompt.kind !== "WORD") return;
       if (state.prompt.kind === "N2L") {
         const c = v.trim();
         if (c.length >= 1 && /^[A-Za-z]$/.test(c)) submit(c);
@@ -1267,6 +1363,19 @@
       if (state.direction === "WORD") state.wordTimeout = t;
       else state.practiceTimeout = t;
       render();
+    });
+
+    el.practiceInputRow.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-answer-mode]");
+      if (!btn) return;
+      state.practiceAnswerMode = btn.dataset.answerMode;
+      render();
+    });
+
+    el.choices.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-choice]");
+      if (!btn) return;
+      submit(btn.dataset.choice || "");
     });
 
     el.statsBtn.addEventListener("click", () => {
