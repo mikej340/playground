@@ -604,14 +604,37 @@
     let letterStats = loadStats();
 
     function computeWeights(kind) {
+      // Compute global average ms per correct answer across all letters
+      let totalTime = 0, totalCorrect = 0;
+      Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i)).forEach(letter => {
+        const s = letterStats[kind][letter] || { a: 0, w: 0, t: 0 };
+        const correct = s.a - s.w;
+        if (correct > 0 && s.t > 0) {
+          totalTime += s.t;
+          totalCorrect += correct;
+        }
+      });
+      const globalAvg = totalCorrect > 0 ? totalTime / totalCorrect : 0;
+    
       return Array.from({ length: 26 }, (_, i) => {
         const letter = String.fromCharCode(65 + i);
         const s = letterStats[kind][letter] || { a: 0, w: 0, t: 0 };
-        const errorRate = s.a > 0 ? s.w / s.a : 0;
+        const correct = s.a - s.w;
+    
+        const errorRate  = s.a > 0 ? s.w / s.a : 0;
         const confidence = Math.min(s.a / MIN_ATTEMPTS, 1);
-        return 1 + confidence * errorRate * 4;
+    
+        let timeScore = 0;
+        if (globalAvg > 0 && correct > 0 && s.t > 0) {
+          const avgTime = s.t / correct;
+          timeScore = Math.max(0, avgTime / globalAvg - 1); // 0 at avg, 1.0 at 2× avg
+        }
+    
+        const ALPHA = 0.5; // tune this — 0.5 means 2× slow ≈ half a wrong answer
+        return 1 + confidence * (errorRate + ALPHA * timeScore) * 4;
       });
     }
+    
 
     function weightedPickN(kind) {
       const weights = computeWeights(kind);
