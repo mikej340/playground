@@ -686,7 +686,6 @@
       s.a++;
       if (!correct) {
         s.w++;
-        pickQueues[kind] = []; // force refill with updated weights next pick
       }
       if (correct) s.t += elapsedMs;
       letterStats[kind][letter] = s;
