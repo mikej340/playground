@@ -372,6 +372,10 @@
   padding: 4px 8px;
 }
 .stats-section { margin-bottom: 28px; }
+.stats-section.tappable {
+  cursor: pointer;
+  user-select: none;
+}
 .stats-section-title {
   font-size: 11px;
   font-weight: 600;
@@ -395,6 +399,9 @@
 .stats-cell.good { background: #bbf7d0; }
 .stats-cell.ok   { background: #fef08a; }
 .stats-cell.bad  { background: #fecaca; }
+.stats-cell.freq {
+  color: #0f172a;
+}
 .stats-letter { font-size: 17px; font-weight: 700; line-height: 1; }
 .stats-num {
   font-size: 9px;
@@ -711,6 +718,7 @@
       practiceTimeLeft: 5,
       statsOpen: false,
       nflEasterEggActive: false,
+      statsFrequencyView: { N2L: false, L2N: false },
     };
 
     let timerId = null;
@@ -1130,8 +1138,25 @@
     function renderStats() {
       const LETTERS = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i));
 
-      function cell(kind, letter) {
+      function frequencyColor(share, maxShare) {
+        if (share <= 0 || maxShare <= 0) return "#e7e5e4";
+        const strength = Math.max(0.15, Math.min(1, share / maxShare));
+        const alpha = 0.12 + strength * 0.58;
+        return `rgba(234, 88, 12, ${alpha.toFixed(3)})`;
+      }
+
+      function cell(kind, letter, showFrequency) {
         const s = letterStats[kind][letter] || { a: 0, w: 0, t: 0 };
+        const totalAttempts = LETTERS.reduce((sum, ltr) => sum + (letterStats[kind][ltr]?.a || 0), 0);
+        const maxAttempts = Math.max(...LETTERS.map((ltr) => letterStats[kind][ltr]?.a || 0));
+        if (showFrequency) {
+          if (totalAttempts === 0 || s.a === 0) {
+            return `<div class="stats-cell none freq"><div class="stats-letter">${letter}</div><div class="stats-num">0.0%</div></div>`;
+          }
+          const pct = (s.a / totalAttempts) * 100;
+          const color = frequencyColor(s.a / totalAttempts, maxAttempts / totalAttempts);
+          return `<div class="stats-cell freq" style="background:${color};"><div class="stats-letter">${letter}</div><div class="stats-num">${s.a}/${totalAttempts}<br>${pct.toFixed(1)}%</div></div>`;
+        }
         if (s.a === 0) {
           return `<div class="stats-cell none"><div class="stats-letter">${letter}</div><div class="stats-num">—</div></div>`;
         }
@@ -1167,13 +1192,13 @@
           <div class="stats-section-title">Sprint Bests</div>
           <div class="sprint-bests">${sprintHTML}</div>
         </div>
-        <div class="stats-section">
-          <div class="stats-section-title">Number → Letter</div>
-          <div class="stats-grid">${LETTERS.map(l => cell("N2L", l)).join("")}</div>
+        <div class="stats-section tappable" data-stats-kind="N2L">
+          <div class="stats-section-title">Number → Letter${state.statsFrequencyView.N2L ? " · Frequency Heatmap" : ""}</div>
+          <div class="stats-grid">${LETTERS.map(l => cell("N2L", l, state.statsFrequencyView.N2L)).join("")}</div>
         </div>
-        <div class="stats-section">
-          <div class="stats-section-title">Letter → Number</div>
-          <div class="stats-grid">${LETTERS.map(l => cell("L2N", l)).join("")}</div>
+        <div class="stats-section tappable" data-stats-kind="L2N">
+          <div class="stats-section-title">Letter → Number${state.statsFrequencyView.L2N ? " · Frequency Heatmap" : ""}</div>
+          <div class="stats-grid">${LETTERS.map(l => cell("L2N", l, state.statsFrequencyView.L2N)).join("")}</div>
         </div>
         <button class="btn-secondary" id="statsClear">Clear all stats</button>
       `;
@@ -1190,6 +1215,14 @@
         localStorage.removeItem(STORAGE_KEYS.SPRINT_BESTS);
         localStorage.removeItem(STORAGE_KEYS.SPRINT_SUMMARIES);
         renderStats();
+      });
+      el.statsView.querySelectorAll("[data-stats-kind]").forEach((section) => {
+        section.addEventListener("click", () => {
+          const kind = section.dataset.statsKind;
+          if (!kind) return;
+          state.statsFrequencyView[kind] = !state.statsFrequencyView[kind];
+          renderStats();
+        });
       });
     }
 
